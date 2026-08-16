@@ -9,7 +9,10 @@ keine eigene Verbindung/Session zum Ecovacs-Konto aufgebaut.
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 import logging
+import lzma
 from typing import Any
 
 from deebot_client.commands.json.common import JsonCommand
@@ -22,6 +25,20 @@ _LOGGER = logging.getLogger(__name__)
 # Pflichtfelder von setAreaParameter, Namen exakt wie von der Ecovacs-App
 # gesendet (aus einer MQTT-Aufzeichnung des GOAT-Protokolls).
 AREA_PARAM_FIELDS = ("mowHeightLevel", "cutMode", "obstacleHeight", "angle")
+
+
+
+def decompress_subsets(payload: str) -> Any:
+    """Entpackt ein base64+LZMA-Feld, wie Ecovacs es für Kartendaten nutzt.
+
+    Format: 5 Byte LZMA-Properties, 4 Byte Länge (little endian), dann die
+    Daten. Der Dekompressor erwartet an dieser Stelle das 8-Byte-Feld des
+    .lzma-Containers, deshalb wird es durch "Länge unbekannt" ersetzt.
+    """
+    raw = base64.b64decode(payload)
+    decompressor = lzma.LZMADecompressor(lzma.FORMAT_ALONE)
+    data = decompressor.decompress(raw[:5] + b"\xff" * 8 + raw[9:])
+    return json.loads(data.decode("utf-8"))
 
 
 class ZoneApiError(HomeAssistantError):
@@ -63,6 +80,8 @@ class EcovacsZoneApi:
     def __init__(self, device: Any) -> None:
         self._device = device
         self._zone_cache: dict[str, dict[str, Any]] = {}
+        # areaID -> Name aus der Karte; leerer Name = verwaister Datensatz
+        self._area_names: dict[str, str] = {}
         self._lock = asyncio.Lock()
 
     @property
@@ -126,6 +145,68 @@ class EcovacsZoneApi:
     def _body_data(resp: dict[str, Any]) -> dict[str, Any]:
         data = resp.get("body", {}).get("data")
         return data if isinstance(data, dict) else {}
+
+
+    # --- Bereichsnamen ------------------------------------------------------
+
+    def area_name(self, area_id: str) -> str | None:
+        """Der in der App vergebene Name, oder None wenn unbekannt."""
+        return self._area_names.get(str(area_id)) or None
+
+    def is_orphan(self, area_id: str) -> bool:
+        """True, wenn der Datensatz zu keiner Mähfläche mehr gehört.
+
+        getAreaParameter liefert auch Reste gelöschter Flächen. In der Karte
+        haben die einen leeren Namen; solange die Karte nicht gelesen werden
+        konnte, gilt niemand als verwaist.
+        """
+        return str(area_id) in self._area_names and not self._area_names[str(area_id)]
+
+    async def _async_active_map_id(self) -> str:
+        """Die mid der Karte, die der Mäher gerade benutzt."""
+        resp = await self._send("getCachedMapInfo")
+        for info in self._body_data(resp).get("info") or []:
+            if info.get("using"):
+                return str(info["mid"])
+        raise ZoneApiError("Keine aktive Karte gefunden.")
+
+    async def async_refresh_area_names(self) -> dict[str, str]:
+        """Liest die Bereichsnamen aus der aktiven Karte.
+
+        getAreaSet liefert je Zeile [aid, mssid, Name, ?, x, y, ?]. Wichtig ist
+        die aid der *aktiven* Karte und aid "0" für "alle Bereiche" - genau so
+        fragt auch die Ecovacs-App.
+        """
+        resp = await self._send(
+            "getAreaSet", {"mid": await self._async_active_map_id(), "aid": "0", "type": "ar"}
+        )
+        subsets = self._body_data(resp).get("subsets")
+        if not subsets:
+            raise ZoneApiError("Karte enthält keine Bereichsdaten.")
+
+        try:
+            rows = decompress_subsets(subsets)
+        except (lzma.LZMAError, ValueError, UnicodeDecodeError) as err:
+            raise ZoneApiError(f"Bereichsdaten nicht lesbar: {err}") from err
+
+        names = {
+            str(row[0]): str(row[2]).strip()
+            for row in rows
+            if isinstance(row, list) and len(row) >= 3
+        }
+        async with self._lock:
+            self._area_names = names
+        return names
+
+    async def async_ensure_area_names(self, area_ids: list[str]) -> None:
+        """Holt die Namen nach, sobald ein unbekannter Bereich auftaucht."""
+        if all(str(a) in self._area_names for a in area_ids):
+            return
+        try:
+            await self.async_refresh_area_names()
+        except ZoneApiError as err:
+            # Nicht schlimm: ohne Namen laufen die Zonen unter "Zone N".
+            _LOGGER.debug("Bereichsnamen nicht abrufbar: %s", err)
 
     async def async_refresh_zones(self) -> list[dict[str, Any]]:
         """Lädt alle Zonen-Parameter frisch vom Gerät (getAreaParameter)."""

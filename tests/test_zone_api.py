@@ -18,6 +18,7 @@ pytest.importorskip("deebot_client")
 zone_api = load_component_module("ecovacs_goat", "zone_api")
 
 EcovacsZoneApi = zone_api.EcovacsZoneApi
+decompress_subsets = zone_api.decompress_subsets
 ZoneApiError = zone_api.ZoneApiError
 ZoneOfflineError = zone_api.ZoneOfflineError
 
@@ -312,3 +313,98 @@ async def test_device_label_falls_back_to_model_without_nickname():
     api, device = make_api()
     del device.device_info["nick"]
     assert api.device_label == "GOAT A1600 LiDAR Pro"
+
+
+# --- Bereichsnamen -----------------------------------------------------------
+
+# Echte Antwort des GOAT A1600 LiDAR Pro auf
+# getAreaSet {"mid": "1", "aid": "0", "type": "ar"}; Bereich 1 ist namenlos,
+# also ein Rest einer gelöschten Fläche.
+AREA_SUBSETS = (
+    "XQAABACJAAAAAC2WwEIAXhRj+BovoEy2wrxENoYMrIjUa2Wih1PKS4qNIVXsVCpTijBTEvsz"
+    "BDEPhI/siMFfRjMpsnpFU+9eipYDyMpWrRAKIA=="
+)
+CACHED_MAP_INFO = {
+    "enable": 0,
+    "info": [
+        {"mid": "0", "status": 1, "index": 3, "using": 0, "built": 0, "name": ""},
+        {"mid": "1", "status": 0, "index": 0, "using": 1, "built": 1, "name": ""},
+    ],
+}
+
+
+def test_decompress_subsets_reads_the_area_table():
+    """Base64 + LZMA im Ecovacs-Format, echte Gerätedaten."""
+    assert decompress_subsets(AREA_SUBSETS) == [
+        ["1", "1", "", "", "-1000", "0", "0-0"],
+        ["2", "2", "Mähfläche 1", "", "-4150", "7900", "0-0"],
+        ["3", "3", "Mähfläche 2", "", "-12800", "-9200", "0-0"],
+    ]
+
+
+def _api_with_map(**extra):
+    responses = {
+        "getCachedMapInfo": ok(CACHED_MAP_INFO),
+        "getAreaSet": ok({"mid": "1", "aid": "0", "type": "ar", "subsets": AREA_SUBSETS}),
+        "getAreaParameter": ok({"areaParameters": AREA_PARAMETERS}),
+    }
+    responses.update(extra)
+    return make_api(responses=responses)
+
+
+async def test_area_names_come_from_the_active_map():
+    api, device = _api_with_map()
+    assert await api.async_refresh_area_names() == {
+        "1": "", "2": "Mähfläche 1", "3": "Mähfläche 2",
+    }
+    # Genau der Aufruf, den auch die Ecovacs-App macht.
+    assert device.sent[-1].name == "getAreaSet"
+    assert device.sent[-1].data == {"mid": "1", "aid": "0", "type": "ar"}
+
+
+async def test_unnamed_area_counts_as_orphan():
+    api, _ = _api_with_map()
+    await api.async_refresh_area_names()
+    assert api.is_orphan("1")
+    assert not api.is_orphan("2")
+    assert api.area_name("2") == "Mähfläche 1"
+    assert api.area_name("1") is None
+
+
+async def test_nothing_is_orphaned_before_the_map_was_read():
+    """Ohne Kartendaten darf keine Zone verschwinden."""
+    api, _ = make_api()
+    assert not api.is_orphan("1")
+    assert api.area_name("1") is None
+
+
+async def test_names_are_fetched_once_and_then_reused():
+    api, device = _api_with_map()
+    await api.async_ensure_area_names(["1", "2", "3"])
+    calls = len([s for s in device.sent if s.name == "getAreaSet"])
+    await api.async_ensure_area_names(["1", "2", "3"])
+    assert len([s for s in device.sent if s.name == "getAreaSet"]) == calls
+
+
+async def test_a_new_area_triggers_a_refetch():
+    api, device = _api_with_map()
+    await api.async_ensure_area_names(["1"])
+    before = len([s for s in device.sent if s.name == "getAreaSet"])
+    await api.async_ensure_area_names(["1", "9"])
+    assert len([s for s in device.sent if s.name == "getAreaSet"]) == before + 1
+
+
+async def test_unreadable_map_does_not_break_the_update():
+    """Ohne Namen laufen die Zonen weiter unter ihrer Nummer."""
+    api, _ = _api_with_map(getAreaSet=ok({"subsets": "keinvalidesbase64!!"}))
+    await api.async_ensure_area_names(["1", "2"])
+    assert api.area_name("2") is None
+    assert not api.is_orphan("2")
+
+
+async def test_missing_active_map_raises():
+    api, _ = _api_with_map(
+        getCachedMapInfo=ok({"info": [{"mid": "0", "using": 0}]})
+    )
+    with pytest.raises(ZoneApiError, match="aktive Karte"):
+        await api.async_refresh_area_names()

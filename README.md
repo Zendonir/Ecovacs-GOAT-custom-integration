@@ -44,28 +44,39 @@ Aktualisierungslauf automatisch.
 
 ### Zonennamen
 
-Das Geräteprotokoll kennt **keine** Zonennamen — nur numerische `areaID`s. Am
-Gerät abgefragt (GOAT A1600 LiDAR Pro, Firmware 1.11.31):
+Die Namen kommen automatisch aus der Karte. `getAreaParameter` kennt nur
+`areaID`s, aber `getAreaSet` liefert die Bereichstabelle der aktiven Karte:
 
-| Kommando | Ergebnis |
-| --- | --- |
-| `getAreaParameter` | nur `areaID` + die vier Mähparameter, kein Name |
-| `getCachedMapInfo` | antwortet; `name` ist bei allen Karten leer, und es ist ohnehin der Kartenname |
-| `getAreaSet` `{type: "ar", aid: N}` | antwortet; `subsets` entpackt zu **0 Byte**, für jede `aid` identisch |
-| `getMapSet`, `getMapSet_V2`, `getMapSubSet` | keine Antwort (`errno 500`, „wait for response timed out") |
+```jsonc
+// getAreaSet  {"mid": "<aktive mid>", "aid": "0", "type": "ar"}
+// -> subsets, base64 + LZMA, entpackt:
+[["1","1","",           "","-1000", "0",    "0-0"],
+ ["2","2","Mähfläche 1","","-4150", "7900", "0-0"],
+ ["3","3","Mähfläche 2","","-12800","-9200","0-0"]]
+```
 
-Die Namen liegen also nicht auf dem Mäher, sondern im Ecovacs-Konto. Sie zu
-holen hieße, die App-REST-API mitzuschneiden — ein anderer Angriffspunkt als der
-Gerätekanal, über den diese Integration läuft. Die App selbst vergibt ohnehin
-nur generische Namen („Mähfläche 1", „Mähfläche 2"), solange man sie nicht
-umbenennt.
+Je Zeile: `areaID`, mssid, **Name**, ?, x, y, ?. Entscheidend sind die `mid` der
+aktiven Karte (aus `getCachedMapInfo`, Eintrag mit `using: 1`) und `aid: "0"`
+für „alle Bereiche" — genau so fragt die Ecovacs-App. Mit einer konkreten `aid`
+oder ohne `mid` antwortet der Mäher mit einem leeren Datensatz.
 
-**Zuordnung von Hand:** Am einfachsten von der App aus — dort einen Wert ändern
-und danach `getAreaParameter` lesen (Dienst `ecovacs_goat.send_command`); die
-`areaID`, die sich rührt, gehört zu dieser Mähfläche. Die Nummern stimmen nicht
-überein, und verwaiste Datensätze liegen dazwischen (siehe unten). Danach das
-Gerät in Home Assistant umbenennen; die Entity-IDs hängen an der `did` und der
-`areaID`, Umbenennen bricht also nichts.
+Die Zonen-Geräte heißen deshalb „&lt;Mäher&gt; Mähfläche 1" statt „Zone 2". In
+Home Assistant umbenennen geht weiterhin und überschreibt das dauerhaft.
+
+### Verwaiste Bereiche
+
+`getAreaParameter` liefert auch Datensätze gelöschter Flächen. Sie sind an dem
+**leeren Namen** in der Kartentabelle zu erkennen (oben `areaID 1`) und bekommen
+keine Entities.
+
+Am Testgerät kamen drei Datensätze für zwei Mähflächen zurück, und
+Schreibvorgänge auf den verwaisten blieben folgenlos: der Mäher speichert sie,
+aber weder App noch Mähauftrag beachten sie. Ein Gegentest bestätigte das — nach
+einer Änderung in der App bewegten sich `areaID 2` und `3`, während `areaID 1`
+den Wert behielt, den diese Integration Stunden zuvor gesetzt hatte.
+
+Kann die Karte nicht gelesen werden, gilt vorsichtshalber niemand als verwaist
+und alle Bereiche erscheinen wie bisher unter ihrer Nummer.
 
 ### Wertebereiche
 

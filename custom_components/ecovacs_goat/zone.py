@@ -83,9 +83,12 @@ async def async_setup_zones(
 
         async def _async_update(api: EcovacsZoneApi = api) -> list[dict[str, Any]]:
             try:
-                return await api.async_refresh_zones()
+                zones = await api.async_refresh_zones()
             except ZoneApiError as err:
                 raise UpdateFailed(str(err)) from err
+            # Namen nur nachladen, wenn ein unbekannter Bereich auftaucht.
+            await api.async_ensure_area_names(zone_ids_from(zones))
+            return zones
 
         coordinator: ZoneCoordinator = DataUpdateCoordinator(
             hass,
@@ -97,12 +100,14 @@ async def async_setup_zones(
         )
         await coordinator.async_refresh()
 
-        if zone_ids := zone_ids_from(coordinator.data):
+        if zone_ids := [
+            zone for zone in zone_ids_from(coordinator.data) if not api.is_orphan(zone)
+        ]:
             _LOGGER.info(
                 "%s: %d Zone(n) gefunden: %s",
                 api.device_label,
                 len(zone_ids),
-                ", ".join(zone_ids),
+                ", ".join(f"{z} ({api.area_name(z) or 'ohne Namen'})" for z in zone_ids),
             )
         elif coordinator.last_update_success:
             _LOGGER.warning(
@@ -118,10 +123,15 @@ async def async_setup_zones(
 
 
 def _zone_device_info(api: EcovacsZoneApi, zone_id: str) -> DeviceInfo:
-    """Gerät für eine einzelne Zone, aufgehängt unter dem Mäher."""
+    """Gerät für eine einzelne Zone, aufgehängt unter dem Mäher.
+
+    Der Name kommt aus der Karte („Mähfläche 1"); ohne Karte bleibt es bei der
+    areaID. Umbenennen in Home Assistant überschreibt das dauerhaft.
+    """
+    label = api.area_name(zone_id) or f"Zone {zone_id}"
     return DeviceInfo(
         identifiers={(DOMAIN, f"{api.device_id}_zone_{zone_id}")},
-        name=f"{api.device_label} Zone {zone_id}",
+        name=f"{api.device_label} {label}",
         manufacturer="Ecovacs",
         model=api.model,
         via_device=(DOMAIN, api.device_id),
@@ -162,7 +172,7 @@ def _async_add_per_zone(
             new = [
                 zone
                 for zone in zone_ids_from(runtime.coordinator.data)
-                if zone not in known
+                if zone not in known and not runtime.api.is_orphan(zone)
             ]
             if not new:
                 return
