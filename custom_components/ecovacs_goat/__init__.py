@@ -27,6 +27,7 @@ from homeassistant.helpers.typing import ConfigType
 from .const import CONF_OVERRIDE_REST_URL, DOMAIN, UNSUPPORTED_CLASSES
 from .controller import EcovacsController
 from .registry import RegistrationError, register_classes
+from .services import async_setup_services
 from .util import get_client_device_id
 from .zone import async_setup_zones
 
@@ -50,6 +51,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the component."""
+    async_setup_services(hass)
     return True
 
 

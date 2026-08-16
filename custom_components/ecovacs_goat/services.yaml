@@ -1,0 +1,15 @@
+send_command:
+  fields:
+    command:
+      required: true
+      example: getCachedMapInfo
+      selector:
+        text:
+    payload:
+      example: '{"act": "start"}'
+      selector:
+        object:
+    device_id:
+      selector:
+        device:
+          integration: ecovacs_goat

@@ -356,5 +356,25 @@
         "self_hosted": "Self-hosted"
       }
     }
+  },
+  "services": {
+    "send_command": {
+      "name": "Kommando senden",
+      "description": "Sendet ein rohes Kommando an das Gerät und gibt dessen Antwort zurück. Zum Erkunden des Protokolls gedacht; get-Kommandos fragen nur ab, set- und Aktionskommandos ändern Einstellungen oder setzen das Gerät in Bewegung.",
+      "fields": {
+        "command": {
+          "name": "Kommando",
+          "description": "Name des Kommandos, z. B. getCachedMapInfo."
+        },
+        "payload": {
+          "name": "Nutzdaten",
+          "description": "Optionale Kommandodaten. Bei den meisten get-Kommandos weglassen."
+        },
+        "device_id": {
+          "name": "Gerät",
+          "description": "Zielgerät. Kann entfallen, wenn nur eines eingerichtet ist."
+        }
+      }
+    }
   }
 }

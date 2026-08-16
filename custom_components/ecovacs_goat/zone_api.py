@@ -112,6 +112,16 @@ class EcovacsZoneApi:
 
         return response.get("resp", response)
 
+    async def async_send_raw(
+        self, cmd_name: str, data: dict[str, Any] | list[Any] | None = None
+    ) -> dict[str, Any]:
+        """Setzt ein beliebiges Kommando ab und gibt die Antwort zurück.
+
+        Einstieg für den send_command-Dienst; die Auswertung bleibt dem Aufrufer
+        überlassen.
+        """
+        return await self._send(cmd_name, data)
+
     @staticmethod
     def _body_data(resp: dict[str, Any]) -> dict[str, Any]:
         data = resp.get("body", {}).get("data")

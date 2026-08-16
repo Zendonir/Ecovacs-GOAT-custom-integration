@@ -355,5 +355,25 @@
         "self_hosted": "Self-hosted"
       }
     }
+  },
+  "services": {
+    "send_command": {
+      "name": "Send command",
+      "description": "Sends a raw command to the device and returns its response. For exploring the protocol; get commands only query, set and action commands change settings or move the device.",
+      "fields": {
+        "command": {
+          "name": "Command",
+          "description": "Command name, e.g. getCachedMapInfo."
+        },
+        "payload": {
+          "name": "Payload",
+          "description": "Optional command data. Omit for most get commands."
+        },
+        "device_id": {
+          "name": "Device",
+          "description": "Target device. Can be omitted if only one is set up."
+        }
+      }
+    }
   }
 }
