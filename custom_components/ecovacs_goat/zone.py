@@ -262,6 +262,12 @@ class EcovacsZoneNumber(CoordinatorEntity, NumberEntity):
         """Set a new value."""
         await self._api.async_set_zone_parameter(self._zone_id, self._field, int(value))
         self.async_write_ha_state()
+        # Der Mäher quittiert jedes setAreaParameter mit "ok", auch wenn er den
+        # Wert nicht übernimmt. Ohne Rückfrage stünde bis zum nächsten regulären
+        # Lauf (zwei Minuten) der gewünschte statt des tatsächlichen Werts da.
+        # Der Coordinator entprellt die Anfrage, schnelle Klickfolgen lösen
+        # deshalb nur eine Abfrage aus.
+        await self.coordinator.async_request_refresh()
 
 
 class EcovacsZoneStartButton(ButtonEntity):
