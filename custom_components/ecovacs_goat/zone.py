@@ -237,6 +237,7 @@ class EcovacsZoneNumber(CoordinatorEntity, NumberEntity):
         self._attr_native_min_value = spec["min"]
         self._attr_native_max_value = spec["max"]
         self._attr_native_step = spec["step"]
+        self._attr_native_unit_of_measurement = spec.get("unit")
         self._attr_device_info = _zone_device_info(self._api, zone_id)
 
         observed_min, observed_max = spec["observed"]

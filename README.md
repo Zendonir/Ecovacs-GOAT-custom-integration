@@ -56,14 +56,16 @@ Gerät abgefragt (GOAT A1600 LiDAR Pro, Firmware 1.11.31):
 
 Die Namen liegen also nicht auf dem Mäher, sondern im Ecovacs-Konto. Sie zu
 holen hieße, die App-REST-API mitzuschneiden — ein anderer Angriffspunkt als der
-Gerätekanal, über den diese Integration läuft.
+Gerätekanal, über den diese Integration läuft. Die App selbst vergibt ohnehin
+nur generische Namen („Mähfläche 1", „Mähfläche 2"), solange man sie nicht
+umbenennt.
 
 **Zuordnung von Hand:** Setze in Home Assistant für eine Zone eine auffällige
-Schnitthöhe und sieh in der App nach, welche benannte Zone sich geändert hat
-(Zonendialog schließen und neu öffnen, die App cacht). So ist in wenigen Minuten
-klar, welche `areaID` zu welchem Namen gehört; danach das Gerät in Home
-Assistant umbenennen. Die Entity-IDs hängen an der `did` und der `areaID`,
-Umbenennen bricht also nichts.
+Schnitthöhe und sieh in der App nach, welche Mähfläche sich geändert hat
+(Zonendialog schließen und neu öffnen, die App cacht). Achtung: die Nummern
+stimmen nicht überein — im Testgerät war `areaID 1` die „Mähfläche 2" und
+`areaID 2` die „Mähfläche 1". Danach das Gerät in Home Assistant umbenennen; die
+Entity-IDs hängen an der `did` und der `areaID`, Umbenennen bricht also nichts.
 
 ### Zonen, die es nicht mehr gibt
 
@@ -82,13 +84,23 @@ Number-Entity zeigt, was in der Aufzeichnung real vorkam:
 
 | Parameter | Eingestellt | Beobachtet |
 | --- | --- | --- |
-| `mowHeightLevel` | 1–11 | 3–5 |
+| `mowHeightLevel` (cm) | 1–11 | 3–7 |
 | `cutMode` | 1–10 | 4 / 7 |
 | `obstacleHeight` | 0–3 | 1–2 |
 | `angle` | 0–360 | 90–268 |
 
 Werte außerhalb des beobachteten Bereichs sind ungetestet. Anpassbar in
 `const.py` (`ZONE_FIELD_SPECS`).
+
+`mowHeightLevel` ist trotz des Namens **keine Stufe, sondern die Schnitthöhe in
+Zentimetern**: die App zeigt für die Werte 5 und 7 genau „5cm" und „7cm". Die
+Entity trägt die Einheit deshalb aus.
+
+Offen: Die App zeigt je Fläche auch eine Hindernishöhe (10 cm bzw. 15 cm),
+während `obstacleHeight` bei beiden Flächen `2` ist — dieser Wert lässt sich
+also nicht so direkt lesen wie die Schnitthöhe. Auch die Winkelangaben der App
+(118°, 2°) passen nicht zu den gespeicherten `angle`-Werten (152, 180); die
+Option „Ändere die Mährichtung wöchentlich" dürfte dabei mitspielen.
 
 ### Verifiziertes Protokoll
 
