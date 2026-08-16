@@ -1,76 +1,305 @@
-"""Sensor-Entity: aktueller Zonen-Mähstatus."""
+"""Ecovacs sensor module."""
 
-from __future__ import annotations
-
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import timedelta
-import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any, override
 
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.core import HomeAssistant
+from deebot_client.capabilities import CapabilityEvent, CapabilityLifeSpan, DeviceType
+from deebot_client.device import Device
+from deebot_client.events import (
+    BatteryEvent,
+    ErrorEvent,
+    Event,
+    LifeSpan,
+    LifeSpanEvent,
+    NetworkInfoEvent,
+    StatsEvent,
+    TotalStatsEvent,
+    station,
+)
 
-from .const import STATUS_INTERVAL_SECONDS
-from .entity import controller_device_info
-from .zone_api import ZoneApiError
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
+from homeassistant.const import (
+    ATTR_BATTERY_LEVEL,
+    CONF_DESCRIPTION,
+    PERCENTAGE,
+    EntityCategory,
+    UnitOfArea,
+    UnitOfTime,
+)
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.icon import icon_for_battery_level
+from homeassistant.helpers.typing import StateType
 
-if TYPE_CHECKING:
-    from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from . import EcovacsConfigEntry
+from .const import SUPPORTED_LIFESPANS, ZONE_STATUS_INTERVAL_SECONDS
+from .entity import (
+    EcovacsCapabilityEntityDescription,
+    EcovacsDescriptionEntity,
+    EcovacsEntity,
+)
+from .util import get_name_key, get_options, get_supported_entities
+from .zone import async_setup_zone_sensors
 
-    from . import EcovacsGoatConfigEntry
-    from .zone_api import EcovacsZoneApi
+SCAN_INTERVAL = timedelta(seconds=ZONE_STATUS_INTERVAL_SECONDS)
 
-_LOGGER = logging.getLogger(__name__)
-SCAN_INTERVAL = timedelta(seconds=STATUS_INTERVAL_SECONDS)
+
+@dataclass(kw_only=True, frozen=True)
+class EcovacsSensorEntityDescription[EventT: Event](
+    EcovacsCapabilityEntityDescription,
+    SensorEntityDescription,
+):
+    """Ecovacs sensor entity description."""
+
+    value_fn: Callable[[EventT], StateType]
+    native_unit_of_measurement_fn: Callable[[DeviceType], str | None] | None = None
+
+
+@callback
+def get_area_native_unit_of_measurement(device_type: DeviceType) -> str | None:
+    """Get the area native unit of measurement based on device type."""
+    if device_type is DeviceType.MOWER:
+        return UnitOfArea.SQUARE_CENTIMETERS
+    return UnitOfArea.SQUARE_METERS
+
+
+ENTITY_DESCRIPTIONS: tuple[EcovacsSensorEntityDescription, ...] = (
+    # Stats
+    EcovacsSensorEntityDescription[StatsEvent](
+        key="stats_area",
+        capability_fn=lambda caps: caps.stats.clean,
+        value_fn=lambda e: e.area,
+        translation_key="stats_area",
+        device_class=SensorDeviceClass.AREA,
+        native_unit_of_measurement_fn=get_area_native_unit_of_measurement,
+        suggested_unit_of_measurement=UnitOfArea.SQUARE_METERS,
+    ),
+    EcovacsSensorEntityDescription[StatsEvent](
+        key="stats_time",
+        capability_fn=lambda caps: caps.stats.clean,
+        value_fn=lambda e: e.time,
+        translation_key="stats_time",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        suggested_unit_of_measurement=UnitOfTime.MINUTES,
+    ),
+    # TotalStats
+    EcovacsSensorEntityDescription[TotalStatsEvent](
+        capability_fn=lambda caps: caps.stats.total,
+        value_fn=lambda e: e.area,
+        key="total_stats_area",
+        translation_key="total_stats_area",
+        device_class=SensorDeviceClass.AREA,
+        native_unit_of_measurement=UnitOfArea.SQUARE_METERS,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    EcovacsSensorEntityDescription[TotalStatsEvent](
+        capability_fn=lambda caps: caps.stats.total,
+        value_fn=lambda e: e.time,
+        key="total_stats_time",
+        translation_key="total_stats_time",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        suggested_unit_of_measurement=UnitOfTime.HOURS,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    EcovacsSensorEntityDescription[TotalStatsEvent](
+        capability_fn=lambda caps: caps.stats.total,
+        value_fn=lambda e: e.cleanings,
+        key="total_stats_cleanings",
+        translation_key="total_stats_cleanings",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    EcovacsSensorEntityDescription[BatteryEvent](
+        capability_fn=lambda caps: caps.battery,
+        value_fn=lambda e: e.value,
+        key=ATTR_BATTERY_LEVEL,
+        native_unit_of_measurement=PERCENTAGE,
+        device_class=SensorDeviceClass.BATTERY,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    EcovacsSensorEntityDescription[NetworkInfoEvent](
+        capability_fn=lambda caps: caps.network,
+        value_fn=lambda e: e.ip,
+        key="network_ip",
+        translation_key="network_ip",
+        entity_registry_enabled_default=False,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    EcovacsSensorEntityDescription[NetworkInfoEvent](
+        capability_fn=lambda caps: caps.network,
+        value_fn=lambda e: e.rssi,
+        key="network_rssi",
+        translation_key="network_rssi",
+        entity_registry_enabled_default=False,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    EcovacsSensorEntityDescription[NetworkInfoEvent](
+        capability_fn=lambda caps: caps.network,
+        value_fn=lambda e: e.ssid,
+        key="network_ssid",
+        translation_key="network_ssid",
+        entity_registry_enabled_default=False,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # Station
+    EcovacsSensorEntityDescription[station.StationEvent](
+        capability_fn=lambda caps: caps.station.state if caps.station else None,
+        value_fn=lambda e: get_name_key(e.state),
+        key="station_state",
+        translation_key="station_state",
+        device_class=SensorDeviceClass.ENUM,
+        options=get_options(station.State),
+    ),
+)
+
+
+@dataclass(kw_only=True, frozen=True)
+class EcovacsLifespanSensorEntityDescription(SensorEntityDescription):
+    """Ecovacs lifespan sensor entity description."""
+
+    component: LifeSpan
+    value_fn: Callable[[LifeSpanEvent], int | float]
+
+
+LIFESPAN_ENTITY_DESCRIPTIONS = tuple(
+    EcovacsLifespanSensorEntityDescription(
+        component=component,
+        value_fn=lambda e: e.percent,
+        key=f"lifespan_{component.name.lower()}",
+        translation_key=f"lifespan_{component.name.lower()}",
+        native_unit_of_measurement=PERCENTAGE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    )
+    for component in SUPPORTED_LIFESPANS
+)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: EcovacsGoatConfigEntry,
+    config_entry: EcovacsConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the status sensor."""
-    async_add_entities([EcovacsZoneStatusSensor(entry.runtime_data.api)])
+    """Add entities for passed config_entry in HA."""
+    controller = config_entry.runtime_data
+
+    entities: list[EcovacsEntity] = get_supported_entities(
+        controller, EcovacsSensor, ENTITY_DESCRIPTIONS
+    )
+    entities.extend(
+        EcovacsLifespanSensor(device, device.capabilities.life_span, description)
+        for device in controller.devices
+        for description in LIFESPAN_ENTITY_DESCRIPTIONS
+        if description.component in device.capabilities.life_span.types
+    )
+    entities.extend(
+        EcovacsErrorSensor(device, capability)
+        for device in controller.devices
+        if (capability := device.capabilities.error)
+    )
+
+    async_add_entities(entities)
+
+    async_setup_zone_sensors(config_entry, async_add_entities)
 
 
-class EcovacsZoneStatusSensor(SensorEntity):
-    """Zeigt den aktuell laufenden Zonen-Mähstatus (motionState/aktuelle Zone)."""
+class EcovacsSensor(
+    EcovacsDescriptionEntity[CapabilityEvent],
+    SensorEntity,
+):
+    """Ecovacs sensor."""
 
-    _attr_has_entity_name = True
-    _attr_icon = "mdi:map-marker-path"
-    _attr_name = "Mähstatus"
+    entity_description: EcovacsSensorEntityDescription
 
-    def __init__(self, api: EcovacsZoneApi) -> None:
-        self._api = api
-        self._attr_unique_id = f"{api.device_id}_zone_status"
-        self._attr_native_value: str | None = None
-        self._attr_extra_state_attributes: dict[str, Any] = {}
-        self._attr_device_info = controller_device_info(api)
+    def __init__(
+        self,
+        device: Device,
+        capability: CapabilityEvent,
+        entity_description: EcovacsSensorEntityDescription,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize entity."""
+        super().__init__(device, capability, entity_description, **kwargs)
+        if (
+            entity_description.native_unit_of_measurement_fn
+            and (
+                native_unit_of_measurement
+                := entity_description.native_unit_of_measurement_fn(
+                    device.capabilities.device_type
+                )
+            )
+            is not None
+        ):
+            self._attr_native_unit_of_measurement = native_unit_of_measurement
 
-    async def async_update(self) -> None:
-        try:
-            status = await self._api.async_get_status()
-        except ZoneApiError as err:
-            if self._attr_available:
-                _LOGGER.warning("Status-Abfrage fehlgeschlagen: %s", err)
-            self._attr_available = False
-            return
+    @override
+    async def async_added_to_hass(self) -> None:
+        """Set up the event listeners now that hass is ready."""
+        await super().async_added_to_hass()
 
-        self._attr_available = True
+        async def on_event(event: Event) -> None:
+            value = self.entity_description.value_fn(event)
+            if value is None:
+                return
 
-        clean_info = status.get("cleanInfo") or {}
-        clean_state = clean_info.get("cleanState") or {}
-        content = clean_state.get("content") or {}
+            self._attr_native_value = value
+            self.async_write_ha_state()
 
-        self._attr_native_value = clean_state.get("motionState") or clean_info.get(
-            "state"
-        )
-        self._attr_extra_state_attributes = {
-            "state": clean_info.get("state"),
-            # Nur bei type "spotArea" ist value eine Zonenliste; bei anderen
-            # Mäharten steht dort etwas anderes und wird deshalb ignoriert.
-            "aktuelle_zone": (
-                content.get("value") if content.get("type") == "spotArea" else None
-            ),
-            "battery": (status.get("battery") or {}).get("value"),
-            "charging": (status.get("chargeState") or {}).get("isCharging"),
-        }
+        self._subscribe(self._capability.event, on_event)
+
+
+class EcovacsLifespanSensor(
+    EcovacsDescriptionEntity[CapabilityLifeSpan],
+    SensorEntity,
+):
+    """Lifespan sensor."""
+
+    entity_description: EcovacsLifespanSensorEntityDescription
+
+    @override
+    async def async_added_to_hass(self) -> None:
+        """Set up the event listeners now that hass is ready."""
+        await super().async_added_to_hass()
+
+        async def on_event(event: LifeSpanEvent) -> None:
+            if event.type == self.entity_description.component:
+                self._attr_native_value = self.entity_description.value_fn(event)
+                self.async_write_ha_state()
+
+        self._subscribe(self._capability.event, on_event)
+
+
+class EcovacsErrorSensor(
+    EcovacsEntity[CapabilityEvent[ErrorEvent]],
+    SensorEntity,
+):
+    """Error sensor."""
+
+    _always_available = True
+    _unrecorded_attributes = frozenset({CONF_DESCRIPTION})
+    entity_description: SensorEntityDescription = SensorEntityDescription(
+        key="error",
+        translation_key="error",
+        entity_registry_enabled_default=False,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    )
+
+    @override
+    async def async_added_to_hass(self) -> None:
+        """Set up the event listeners now that hass is ready."""
+        await super().async_added_to_hass()
+
+        async def on_event(event: ErrorEvent) -> None:
+            self._attr_native_value = event.code
+            self._attr_extra_state_attributes = {CONF_DESCRIPTION: event.description}
+
+            self.async_write_ha_state()
+
+        self._subscribe(self._capability.event, on_event)

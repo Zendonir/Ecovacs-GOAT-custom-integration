@@ -3,12 +3,15 @@
   "name": "Ecovacs GOAT",
   "codeowners": [],
   "config_flow": true,
-  "dependencies": ["ecovacs"],
-  "documentation": "https://github.com/zendonir/ecovacs-goat-custom-integration",
-  "integration_type": "device",
-  "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/zendonir/ecovacs-goat-custom-integration/issues",
-  "loggers": ["deebot_client"],
-  "requirements": [],
-  "version": "1.0.0"
+  "documentation": "https://github.com/Zendonir/Ecovacs-GOAT-custom-integration",
+  "integration_type": "hub",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/Zendonir/Ecovacs-GOAT-custom-integration/issues",
+  "loggers": [
+    "deebot_client"
+  ],
+  "requirements": [
+    "deebot-client==18.5.1"
+  ],
+  "version": "2.0.0"
 }

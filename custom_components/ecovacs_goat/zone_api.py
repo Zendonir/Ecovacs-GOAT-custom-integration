@@ -17,9 +17,11 @@ from deebot_client.message import HandlingResult, HandlingState
 
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import AREA_PARAM_FIELDS
-
 _LOGGER = logging.getLogger(__name__)
+
+# Pflichtfelder von setAreaParameter, Namen exakt wie von der Ecovacs-App
+# gesendet (aus einer MQTT-Aufzeichnung des GOAT-Protokolls).
+AREA_PARAM_FIELDS = ("mowHeightLevel", "cutMode", "obstacleHeight", "angle")
 
 
 class ZoneApiError(HomeAssistantError):

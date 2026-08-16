@@ -33,9 +33,18 @@ import importlib
 import logging
 from typing import Any
 
-from .const import DONOR_CLASSES
 
 _LOGGER = logging.getLogger(__name__)
+
+# Geräteklassen, für die deebot-client eine Capability-Definition mitbringt und
+# die als Vorlage für Modelle ohne eigene Definition dienen.
+DONOR_CLASSES = (
+    "51rcxt",  # GOAT A3000 LiDAR Pro
+    "xmp9ds",  # GOAT A1600 RTK
+    "300lc5",  # GOAT O500 Panorama
+    "2i0fns",  # GOAT O1200 LiDAR
+    "5xu9h3",  # GOAT G1
+)
 
 _HARDWARE_PACKAGE = "deebot_client.hardware"
 # Aufbau von deebot-client < 13, als Rückfallebene.

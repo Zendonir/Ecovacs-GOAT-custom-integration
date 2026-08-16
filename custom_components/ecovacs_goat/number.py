@@ -1,86 +1,148 @@
-"""Number-Entities: ein Entity pro Zone x Parameter."""
+"""Ecovacs number module."""
 
-from __future__ import annotations
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import override
 
-from typing import TYPE_CHECKING, Any
+from deebot_client.capabilities import CapabilityNumber, CapabilitySet
+from deebot_client.device import Device
+from deebot_client.events import CleanCountEvent, CutDirectionEvent, VolumeEvent
+from deebot_client.events.base import Event
+from deebot_client.events.water_info import WaterCustomAmountEvent
 
-from homeassistant.components.number import NumberEntity
+from homeassistant.components.number import (
+    NumberEntity,
+    NumberEntityDescription,
+    NumberMode,
+)
+from homeassistant.const import DEGREE, EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import FIELD_SPECS
-from .entity import async_setup_zone_entities, zone_device_info
+from . import EcovacsConfigEntry
+from .entity import (
+    EcovacsCapabilityEntityDescription,
+    EcovacsDescriptionEntity,
+    EcovacsEntity,
+)
+from .util import get_supported_entities
+from .zone import async_setup_zone_numbers
 
-if TYPE_CHECKING:
-    from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-    from . import EcovacsGoatConfigEntry
-    from .zone_api import EcovacsZoneApi
+@dataclass(kw_only=True, frozen=True)
+class EcovacsNumberEntityDescription[EventT: Event](
+    NumberEntityDescription,
+    EcovacsCapabilityEntityDescription,
+):
+    """Ecovacs number entity description."""
+
+    native_max_value_fn: Callable[[EventT], float | int | None] = lambda _: None
+    value_fn: Callable[[EventT], float | None]
+
+
+ENTITY_DESCRIPTIONS: tuple[EcovacsNumberEntityDescription, ...] = (
+    EcovacsNumberEntityDescription[VolumeEvent](
+        capability_fn=lambda caps: caps.settings.volume,
+        value_fn=lambda e: e.volume,
+        native_max_value_fn=lambda e: e.maximum,
+        key="volume",
+        translation_key="volume",
+        entity_registry_enabled_default=False,
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=0,
+        native_max_value=10,
+        native_step=1.0,
+    ),
+    EcovacsNumberEntityDescription[CutDirectionEvent](
+        capability_fn=lambda caps: caps.settings.cut_direction,
+        value_fn=lambda e: e.angle,
+        key="cut_direction",
+        translation_key="cut_direction",
+        entity_registry_enabled_default=False,
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=0,
+        native_max_value=180,
+        native_step=1.0,
+        native_unit_of_measurement=DEGREE,
+    ),
+    EcovacsNumberEntityDescription[CleanCountEvent](
+        capability_fn=lambda caps: caps.clean.count,
+        value_fn=lambda e: e.count,
+        key="clean_count",
+        translation_key="clean_count",
+        entity_registry_enabled_default=False,
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=1,
+        native_max_value=4,
+        native_step=1.0,
+        mode=NumberMode.BOX,
+    ),
+    EcovacsNumberEntityDescription[WaterCustomAmountEvent](
+        capability_fn=lambda caps: (
+            caps.water.amount
+            if caps.water and isinstance(caps.water.amount, CapabilityNumber)
+            else None
+        ),
+        value_fn=lambda e: e.value,
+        key="water_amount",
+        translation_key="water_amount",
+        entity_category=EntityCategory.CONFIG,
+        native_step=1.0,
+        mode=NumberMode.BOX,
+    ),
+)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: EcovacsGoatConfigEntry,
+    config_entry: EcovacsConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the zone number entities."""
-    runtime = entry.runtime_data
-
-    async_setup_zone_entities(
-        entry,
-        async_add_entities,
-        lambda zone_id: [
-            EcovacsZoneNumber(runtime.coordinator, runtime.api, zone_id, field)
-            for field in FIELD_SPECS
-        ],
+    """Add entities for passed config_entry in HA."""
+    controller = config_entry.runtime_data
+    entities: list[EcovacsEntity] = get_supported_entities(
+        controller, EcovacsNumberEntity, ENTITY_DESCRIPTIONS
     )
+    if entities:
+        async_add_entities(entities)
+
+    async_setup_zone_numbers(config_entry, async_add_entities)
 
 
-class EcovacsZoneNumber(CoordinatorEntity, NumberEntity):
-    """Ein einzelner Zonen-Parameter (z.B. Schnitthöhe von Zone 2)."""
+class EcovacsNumberEntity[EventT: Event](
+    EcovacsDescriptionEntity[CapabilitySet[EventT, [int]]],
+    NumberEntity,
+):
+    """Ecovacs number entity."""
 
-    _attr_has_entity_name = True
+    entity_description: EcovacsNumberEntityDescription
 
     def __init__(
-        self, coordinator: Any, api: EcovacsZoneApi, zone_id: str, field: str
+        self,
+        device: Device,
+        capability: CapabilitySet[EventT, [int]],
+        entity_description: EcovacsNumberEntityDescription,
     ) -> None:
-        super().__init__(coordinator)
-        self._api = api
-        self._zone_id = zone_id
-        self._field = field
-        spec = FIELD_SPECS[field]
+        """Initialize entity."""
+        super().__init__(device, capability, entity_description)
+        if isinstance(capability, CapabilityNumber):
+            self._attr_native_min_value = capability.min
+            self._attr_native_max_value = capability.max
 
-        self._attr_unique_id = f"{api.device_id}_zone_{zone_id}_{field}"
-        # has_entity_name stellt den Gerätenamen ("... Zone 2") voran, hier steht
-        # deshalb nur der Parameter.
-        self._attr_name = spec["label"]
-        self._attr_icon = spec["icon"]
-        self._attr_native_min_value = spec["min"]
-        self._attr_native_max_value = spec["max"]
-        self._attr_native_step = spec["step"]
-        self._attr_device_info = zone_device_info(api, zone_id)
+    @override
+    async def async_added_to_hass(self) -> None:
+        """Set up the event listeners now that hass is ready."""
+        await super().async_added_to_hass()
 
-        # Die echten Grenzen der Ecovacs-App sind unbekannt; min/max oben sind
-        # geschätzt. Der beobachtete Bereich macht sichtbar, was tatsächlich
-        # belegt ist - Werte ausserhalb davon sind ungetestet.
-        observed_min, observed_max = spec["observed"]
-        self._attr_extra_state_attributes = {
-            "beobachteter_bereich": f"{observed_min}-{observed_max}",
-            "areaID": zone_id,
-        }
+        async def on_event(event: EventT) -> None:
+            self._attr_native_value = self.entity_description.value_fn(event)
+            if maximum := self.entity_description.native_max_value_fn(event):
+                self._attr_native_max_value = maximum
+            self.async_write_ha_state()
 
-    @property
-    def available(self) -> bool:
-        """Nur verfügbar, solange die Zone noch existiert."""
-        return super().available and self._api.get_cached(self._zone_id) is not None
+        self._subscribe(self._capability.event, on_event)
 
-    @property
-    def native_value(self) -> float | None:
-        cached = self._api.get_cached(self._zone_id)
-        if not cached:
-            return None
-        return cached.get(self._field)
-
+    @override
     async def async_set_native_value(self, value: float) -> None:
-        await self._api.async_set_zone_parameter(self._zone_id, self._field, int(value))
-        self.async_write_ha_state()
+        """Set new value."""
+        await self._device.execute_command(self._capability.set(int(value)))

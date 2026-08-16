@@ -3,31 +3,45 @@
     "step": {
       "user": {
         "title": "Ecovacs GOAT",
-        "description": "Ergänzt die Zonensteuerung für den Mäher: Schnitthöhe, Mähmodus, Hinderniserkennung und Mährichtung je Zone, plus gezieltes Starten einzelner Zonen.\n\nNutzt die Verbindung der bereits eingerichteten Ecovacs-Integration mit — es wird keine zweite Anmeldung aufgebaut.\n\nDas Gerätefeld nur ausfüllen, wenn mehrere Ecovacs-Geräte im Konto sind.",
+        "description": "Eigenständige Integration für Ecovacs-Mähroboter mit Zonensteuerung. Sie meldet sich selbst am Ecovacs-Konto an und braucht die offizielle Ecovacs-Integration nicht.",
         "data": {
-          "device_name": "Gerätename (optional)"
-        },
-        "data_description": {
-          "device_name": "Teil des Gerätenamens, z. B. „iHans“. Leer lassen, um das erste gefundene Gerät zu verwenden."
+          "mode": "Installationsart"
+        }
+      },
+      "auth": {
+        "description": "Zugangsdaten deines Ecovacs-Kontos - dieselben wie in der Ecovacs-App.",
+        "data": {
+          "username": "Benutzername oder E-Mail",
+          "password": "Passwort",
+          "country": "Land",
+          "override_rest_url": "REST-URL",
+          "override_mqtt_url": "MQTT-URL",
+          "verify_mqtt_certificate": "MQTT-Zertifikat prüfen"
+        }
+      },
+      "device_verification": {
+        "title": "Gerät bestätigen",
+        "description": "Ecovacs hat einen Bestätigungscode an die E-Mail-Adresse von {username} geschickt. Bitte hier eintragen.",
+        "data": {
+          "verification_code": "Bestätigungscode"
+        }
+      },
+      "reauth_confirm": {
+        "description": "Bitte das Passwort für {username} erneut eingeben.",
+        "data": {
+          "password": "Passwort"
         }
       }
     },
+    "error": {
+      "cannot_connect": "Verbindung fehlgeschlagen.",
+      "invalid_auth": "Benutzername oder Passwort falsch.",
+      "invalid_verification_code": "Bestätigungscode ungültig.",
+      "unknown": "Unerwarteter Fehler."
+    },
     "abort": {
-      "already_configured": "Die Ecovacs-GOAT-Integration ist bereits eingerichtet.",
-      "ecovacs_not_configured": "Bitte zuerst die offizielle Ecovacs-Integration mit deinem Ecovacs-Konto einrichten."
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Weitere Geräteklassen",
-        "data": {
-          "extra_classes": "Zusätzliche Geräteklassen"
-        },
-        "data_description": {
-          "extra_classes": "Mit Leerzeichen oder Komma getrennte Geräteklassen, die zusätzlich angemeldet werden — zum Beispiel ein weiteres GOAT-Modell, das im Log als nicht unterstützt gemeldet wird."
-        }
-      }
+      "already_configured": "Dieses Konto ist bereits eingerichtet.",
+      "reauth_successful": "Erneute Anmeldung erfolgreich."
     }
   }
 }

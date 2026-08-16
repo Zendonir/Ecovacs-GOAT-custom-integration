@@ -35,7 +35,6 @@ def _load_module(name: str) -> types.ModuleType:
 
 
 registry = _load_module("registry")
-const = _load_module("const")
 
 # Bewusst eine Klasse, die es bei deebot-client nicht gibt und nie geben wird.
 # Nicht e4gqia nehmen: der GOAT A1600 LiDAR Pro ist seit 18.x über einen Symlink
@@ -99,7 +98,7 @@ def test_upstream_support_takes_precedence():
     """A class deebot-client ships itself must not be overridden."""
     donor = next(
         d
-        for d in const.DONOR_CLASSES
+        for d in registry.DONOR_CLASSES
         if registry._import_hardware_module(f"deebot_client.hardware.{d}") is not None
     )
     assert registry.register_classes({donor: "donor"}) == {donor: "supported_upstream"}
