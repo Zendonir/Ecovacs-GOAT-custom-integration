@@ -78,6 +78,19 @@ den Wert behielt, den diese Integration Stunden zuvor gesetzt hatte.
 Kann die Karte nicht gelesen werden, gilt vorsichtshalber niemand als verwaist
 und alle Bereiche erscheinen wie bisher unter ihrer Nummer.
 
+### Push statt Warten
+
+Der Mäher meldet jede Änderung der Zonenparameter von sich aus als
+`onAreaParameter` — auch die, die in der Ecovacs-App gemacht wurde.
+deebot-client kennt diese Nachricht nicht; die Integration ergänzt sie in dessen
+Nachrichten-Registry (`deebot_client.messages.json.MESSAGES`) und legt daraus
+ein eigenes Event auf den Event-Bus des Geräts.
+
+Die Entities stehen damit sofort auf dem neuen Wert statt erst beim nächsten
+Abfragelauf. Das reguläre Abfragen alle zwei Minuten bleibt als Rückfallebene
+bestehen; kennt deebot-client die Nachricht eines Tages selbst, bleibt dessen
+Eintrag unangetastet.
+
 ### Wertebereiche
 
 Die echten Grenzen der Ecovacs-App sind nicht bekannt. Die Min-/Max-Werte sind
@@ -166,6 +179,27 @@ Schreiben ist nicht umgesetzt — dafür fehlt eine Aufzeichnung von `setSchedul
 **Der automatische Richtungswechsel erklärt wandernde Winkel:** Ist er aktiv,
 setzt der Mäher `angle` selbst um, und ein in Home Assistant gesetzter Wert hält
 nicht. Wer die Mährichtung fest vorgeben will, schaltet ihn zuerst ab.
+
+## Karte: Sachstand
+
+Eine Kartendarstellung ist noch nicht möglich. Am Gerät abgefragt:
+
+| Kommando | Ergebnis |
+| --- | --- |
+| `getAreaSet` `{mid, aid, type: "ar"}` | Namen und **je einen Punkt** pro Fläche — keine Umrisse. `aid` wird ignoriert, sobald `mid` gesetzt ist |
+| `getMapTrack` | `code 10000 "getMapTrack fail"` im Dock; die Fahrspur gibt es offenbar nur während des Mähens |
+| `getSpecialContour` `{mid}` | antwortet mit `code 0`, aber ohne Daten |
+| `getMI` | verlangt einen `type`, den keine Aufzeichnung nennt |
+| `getMapSet`, `getMapSet_V2`, `getMapSubSet` | keine Antwort (`errno 500`, Zeitüberschreitung) |
+
+Damit fehlt die Geometrie: Flächenumrisse und Hintergrundbild. Was es gibt, sind
+Mittelpunkte und die Position des Mähers — zu wenig für eine Karte, die diesen
+Namen verdient.
+
+Der aussichtsreiche Weg ist derselbe, der die Bereichsnamen gebracht hat: eine
+MQTT-Aufzeichnung, **während die App die Karte anzeigt**. Die Kartenansicht
+schickt `getMapTrack`, `onMapTrack` und `getAreaSet` in Serie; daraus wären die
+richtigen Parameter und das Format des Bilddatenstroms ablesbar.
 
 ## Unbekannte Geräteklassen
 

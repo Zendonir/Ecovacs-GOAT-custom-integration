@@ -38,6 +38,7 @@ from .const import (
     ZONE_STATUS_INTERVAL_SECONDS,
     ZONE_UPDATE_INTERVAL_SECONDS,
 )
+from .push import AreaParameterEvent, register_message
 from .zone_api import EcovacsZoneApi, ZoneApiError
 
 if TYPE_CHECKING:
@@ -116,7 +117,26 @@ async def async_setup_zones(
                 api.device_label,
             )
 
+        if register_message():
+            _async_subscribe_push(entry, api, coordinator)
+
         controller.zones[api.device_id] = ZoneRuntime(api=api, coordinator=coordinator)
+
+
+def _async_subscribe_push(
+    entry: EcovacsConfigEntry, api: EcovacsZoneApi, coordinator: ZoneCoordinator
+) -> None:
+    """Lässt gemeldete Zonenparameter direkt in den Coordinator laufen."""
+
+    async def _on_area_parameter(event: AreaParameterEvent) -> None:
+        api.apply_parameters(event.parameters)
+        await api.async_ensure_area_names(zone_ids_from(event.parameters))
+        # Setzt die Daten und benachrichtigt die Entities, ohne abzufragen.
+        coordinator.async_set_updated_data(event.parameters)
+
+    entry.async_on_unload(
+        api.subscribe(AreaParameterEvent, _on_area_parameter)
+    )
 
 
 # --- Geräte ------------------------------------------------------------------

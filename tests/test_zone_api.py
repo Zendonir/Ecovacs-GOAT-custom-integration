@@ -445,3 +445,63 @@ async def test_send_raw_passes_the_payload():
     api, device = make_api()
     await api.async_send_raw("getPos", {"type": "deebotPos"})
     assert device.sent[-1].data == {"type": "deebotPos"}
+
+
+# --- Push --------------------------------------------------------------------
+
+push = load_component_module("ecovacs_goat", "push")
+
+
+def test_push_message_is_registered_once():
+    from deebot_client.messages.json import MESSAGES
+
+    original = MESSAGES.pop(push.MESSAGE_NAME, None)
+    try:
+        assert push.register_message() is True
+        assert MESSAGES[push.MESSAGE_NAME] is push.OnAreaParameter
+        # Ein vorhandener Eintrag - etwa von deebot-client selbst - bleibt stehen.
+        MESSAGES[push.MESSAGE_NAME] = object
+        assert push.register_message() is True
+        assert MESSAGES[push.MESSAGE_NAME] is object
+    finally:
+        MESSAGES.pop(push.MESSAGE_NAME, None)
+        if original is not None:
+            MESSAGES[push.MESSAGE_NAME] = original
+
+
+class FakeBus:
+    def __init__(self):
+        self.events = []
+
+    def notify(self, event, **kwargs):
+        self.events.append(event)
+
+
+def test_push_message_notifies_the_parameters():
+    bus = FakeBus()
+    result = push.OnAreaParameter._handle_body_data_dict(
+        bus, {"areaParameters": AREA_PARAMETERS}
+    )
+    assert result.state.name == "SUCCESS"
+    assert bus.events[0].parameters == AREA_PARAMETERS
+
+
+def test_push_message_ignores_a_payload_without_parameters():
+    bus = FakeBus()
+    result = push.OnAreaParameter._handle_body_data_dict(bus, {"foo": 1})
+    assert result.state.name != "SUCCESS"
+    assert not bus.events
+
+
+async def test_apply_parameters_fills_the_cache_without_a_request():
+    api, device = make_api()
+    api.apply_parameters(AREA_PARAMETERS)
+    assert api.get_cached("2") == AREA_PARAMETERS[1]
+    assert device.sent == []
+
+
+async def test_apply_parameters_drops_removed_zones():
+    api, _ = make_api()
+    api.apply_parameters(AREA_PARAMETERS)
+    api.apply_parameters(AREA_PARAMETERS[:1])
+    assert api.get_cached("2") is None

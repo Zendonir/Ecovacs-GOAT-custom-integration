@@ -99,6 +99,10 @@ class EcovacsZoneApi:
         """Die did des Mähers - eindeutig pro Gerät im Ecovacs-Konto."""
         return str(self._device.device_info["did"])
 
+    def subscribe(self, event_type: Any, callback: Any) -> Any:
+        """Abonniert ein Event des Geräts; liefert die Abmeldefunktion."""
+        return self._device.events.subscribe(event_type, callback)
+
     async def _send(
         self, cmd_name: str, data: dict[str, Any] | list[Any] | None = None
     ) -> dict[str, Any]:
@@ -221,6 +225,16 @@ class EcovacsZoneApi:
                 str(p["areaID"]): dict(p) for p in params if "areaID" in p
             }
         return params
+
+    def apply_parameters(self, params: list[dict[str, Any]]) -> None:
+        """Übernimmt Zonenparameter aus einer Push-Nachricht.
+
+        Gleiche Wirkung wie async_refresh_zones, nur ohne Abfrage: der Mäher hat
+        die Werte gerade selbst geschickt.
+        """
+        self._zone_cache = {
+            str(p["areaID"]): dict(p) for p in params if "areaID" in p
+        }
 
     def get_cached(self, area_id: str) -> dict[str, Any] | None:
         return self._zone_cache.get(str(area_id))
