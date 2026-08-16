@@ -23,6 +23,7 @@ from deebot_client.capabilities import DeviceType
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.components.number import NumberEntity
+from homeassistant.components.select import SelectEntity
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -37,7 +38,14 @@ from .const import (
     ZONE_STATUS_INTERVAL_SECONDS,
     ZONE_UPDATE_INTERVAL_SECONDS,
 )
-from .scale import ZONE_FIELD_SPECS, to_device, to_display
+from .scale import (
+    OBSTACLE_OPTIONS,
+    ZONE_FIELD_SPECS,
+    obstacle_label,
+    obstacle_level,
+    to_device,
+    to_display,
+)
 from .push import AreaParameterEvent, register_message
 from .zone_api import EcovacsZoneApi, ZoneApiError
 
@@ -234,6 +242,18 @@ def async_setup_zone_buttons(
 
 
 @callback
+def async_setup_zone_selects(
+    entry: EcovacsConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
+) -> None:
+    """Die Umgebungswahl je Zone."""
+    _async_add_per_zone(
+        entry,
+        async_add_entities,
+        lambda runtime, zone_id: [EcovacsZoneObstacleSelect(runtime, zone_id)],
+    )
+
+
+@callback
 def async_setup_zone_sensors(
     entry: EcovacsConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
@@ -300,6 +320,46 @@ class EcovacsZoneNumber(CoordinatorEntity, NumberEntity):
         # Lauf (zwei Minuten) der gewünschte statt des tatsächlichen Werts da.
         # Der Coordinator entprellt die Anfrage, schnelle Klickfolgen lösen
         # deshalb nur eine Abfrage aus.
+        await self.coordinator.async_request_refresh()
+
+
+class EcovacsZoneObstacleSelect(CoordinatorEntity, SelectEntity):
+    """Die Umgebung einer Zone (obstacleHeight).
+
+    Das Feld heißt nach einer Höhe, wählt aber die Umgebung aus - flacher
+    Untergrund, normal oder hohes Gras. Stufe 0 nimmt das Gerät nicht an.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "Umgebung"
+    _attr_icon = "mdi:sign-caution"
+    _attr_options = list(OBSTACLE_OPTIONS.values())
+
+    def __init__(self, runtime: ZoneRuntime, zone_id: str) -> None:
+        """Initialize entity."""
+        super().__init__(runtime.coordinator)
+        self._api = runtime.api
+        self._zone_id = zone_id
+        self._attr_unique_id = f"{self._api.device_id}_zone_{zone_id}_obstacle"
+        self._attr_device_info = _zone_device_info(self._api, zone_id)
+
+    @property
+    def available(self) -> bool:
+        """Nur verfügbar, solange die Zone existiert und die Stufe bekannt ist."""
+        return super().available and self.current_option is not None
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the selected environment."""
+        cached = self._api.get_cached(self._zone_id) or {}
+        return obstacle_label(cached.get("obstacleHeight"))
+
+    async def async_select_option(self, option: str) -> None:
+        """Select a new environment."""
+        await self._api.async_set_zone_parameter(
+            self._zone_id, "obstacleHeight", obstacle_level(option)
+        )
+        self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
 
 

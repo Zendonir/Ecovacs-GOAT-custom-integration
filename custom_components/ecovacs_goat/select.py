@@ -23,6 +23,7 @@ from .entity import (
     EcovacsDescriptionEntity,
     EcovacsEntity,
 )
+from .zone import async_setup_zone_selects
 from .util import get_name_key, get_supported_entities
 
 
@@ -91,6 +92,8 @@ async def async_setup_entry(
     )
     if entities:
         async_add_entities(entities)
+
+    async_setup_zone_selects(config_entry, async_add_entities)
 
 
 class EcovacsSelectEntity[EventT: Event](

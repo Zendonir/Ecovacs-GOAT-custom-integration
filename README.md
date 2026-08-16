@@ -30,8 +30,8 @@ betreibt, nutzt dafür weiter die offizielle Integration.
 Je erkannter Zone ein eigenes Gerät **„&lt;Mäher&gt; Zone N"** mit
 
 - **Schnitthöhe** (`mowHeightLevel`)
-- **Mähmodus** (`cutMode`)
-- **Hinderniserkennung** (`obstacleHeight`)
+- **Geschwindigkeit** (`cutMode`)
+- **Umgebung** (`obstacleHeight`, Auswahlfeld)
 - **Mährichtung** (`angle`)
 - **Mähen starten** — startet genau diese Zone
 
@@ -93,31 +93,39 @@ Eintrag unangetastet.
 
 ### Stufen und angezeigte Werte
 
-Der Mäher speichert **Stufen**, die App zeigt physikalische Werte — und bei Höhe
-und Geschwindigkeit laufen beide Skalen **gegenläufig**. Die Entities zeigen und
-nehmen deshalb den Wert der App, umgerechnet über
-`Anzeige = offset + faktor × Stufe` (`scale.py`).
+Der Mäher speichert **Stufen**, die App zeigt physikalische Werte — und alle drei
+Skalen laufen **gegenläufig** zur Stufe. Die Entities zeigen und nehmen den Wert
+der App, umgerechnet über `Anzeige = offset + faktor × Stufe` (`scale.py`).
 
-| Feld | Entity | Stufe 1 | Stufe 7 | Umrechnung |
-| --- | --- | --- | --- | --- |
-| `mowHeightLevel` | Schnitthöhe, cm | 9 cm | 3 cm | `cm = 10 − Stufe` |
-| `cutMode` | Geschwindigkeit, m/s | 0,70 | 0,40 | `m/s = 0,75 − 0,05 × Stufe` |
-| `obstacleHeight` | Hinderniserkennung, cm | 10 cm | — | `cm = 5 + 5 × Stufe` |
-| `angle` | Mährichtung, ° | — | — | unverändert |
+| Feld | Entity | Umrechnung | Grenzen des Geräts |
+| --- | --- | --- | --- |
+| `mowHeightLevel` | Schnitthöhe | `cm = 10 − Stufe` | **3–9 cm** |
+| `cutMode` | Geschwindigkeit | `m/s = 0,75 − 0,05 × Stufe` | **0,40–0,70 m/s** |
+| `angle` | Mährichtung | `° = 270 − Stufe` | **0–180°** |
+
+Die Grenzen sind die des Geräts, nicht geschätzt: schneller als 0,7 m/s,
+langsamer als 0,4 m/s, höher als 9 cm oder tiefer als 3 cm nimmt es nicht an.
 
 Belegt gegen die App-Anzeige zweier Flächen desselben Mähers:
 
-| | Stufen im Gerät | Formel | App zeigte |
+| | Gespeichert | Formel | App zeigte |
 | --- | --- | --- | --- |
-| Mähfläche 1 (`areaID 2`) | 5 / 7 / 2 | 5 cm, 0,40 m/s, 15 cm | 5cm, 0.4m/s, 15cm |
-| Mähfläche 2 (`areaID 3`) | 3 / 4 / 1 | 7 cm, 0,55 m/s, 10 cm | 7cm, 0.55m/s, 10cm |
+| Mähfläche 1 (`areaID 2`) | 5 / 7 / 152 | 5 cm, 0,40 m/s, 118° | 5cm, 0.4m/s, 118° |
+| Mähfläche 2 (`areaID 3`) | 3 / 4 / 268 | 7 cm, 0,55 m/s, 2° | 7cm, 0.55m/s, 2° |
 
 `cutMode` heißt im Protokoll nach dem Mähmodus, steuert aber die
 Fahrgeschwindigkeit — die Entity heißt deshalb **Geschwindigkeit**.
 
-Die Hindernishöhe ist nur an zwei Punkten belegt (Stufe 1 und 2), ihre Skala
-also extrapoliert. Das Attribut `beobachtet` an jeder Entity nennt den wirklich
-belegten Bereich.
+### Umgebung statt Hindernishöhe
+
+`obstacleHeight` klingt nach einer Länge, wählt aber die Umgebung. Stufe 0 nimmt
+das Gerät nicht an, deshalb ist es ein Auswahlfeld mit drei Möglichkeiten:
+
+| Stufe | Auswahl |
+| --- | --- |
+| 1 | Flacher Untergrund, kurzes Gras |
+| 2 | Normale Umgebung |
+| 3 | Hohes Gras |
 
 ### Verifiziertes Protokoll
 

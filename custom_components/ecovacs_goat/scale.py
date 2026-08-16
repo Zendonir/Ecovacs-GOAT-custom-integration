@@ -6,19 +6,19 @@ deebot-client und Home Assistant geprüft werden kann.
 
 from __future__ import annotations
 
-# Der Mäher speichert Stufen, die App zeigt physikalische Werte - und bei Höhe
-# und Geschwindigkeit laufen beide Skalen GEGENLÄUFIG. Die Entities zeigen und
-# nehmen deshalb den Wert der App; umgerechnet wird mit
+# Der Mäher speichert Stufen, die App zeigt physikalische Werte - und alle drei
+# Skalen laufen GEGENLÄUFIG zur Stufe. Die Entities zeigen und nehmen den Wert
+# der App; umgerechnet wird mit
 #
 #     Anzeige = offset + faktor * Stufe        Stufe = (Anzeige - offset) / faktor
 #
-# Belegt am GOAT A1600 LiDAR Pro gegen die App-Anzeige zweier Flächen:
-#   Höhe          Stufe 1 = 9 cm,   Stufe 7 = 3 cm
-#   Geschwindigkeit Stufe 1 = 0,7 m/s, Stufe 7 = 0,4 m/s, Stufe 4 = 0,55 m/s
-#   Hindernishöhe Stufe 1 = 10 cm,  Stufe 2 = 15 cm
+# Am GOAT A1600 LiDAR Pro belegt:
+#   Höhe    Stufe 1 = 9 cm,    Stufe 7 = 3 cm      (Gerät kann nur 3-9 cm)
+#   Tempo   Stufe 1 = 0,7 m/s, Stufe 7 = 0,4 m/s   (schneller/langsamer geht nicht)
+#   Winkel  Gerät 270 = 0°,    Gerät 180 = 90°     (App erlaubt 0-180°)
 #
-# Die Hindernishöhe ist nur an zwei Punkten belegt, ihre Skala also
-# extrapoliert. Der Winkel wird unverändert durchgereicht.
+# Die Winkelformel deckt sich mit einer App-Anzeige zweier Flächen: gespeicherte
+# 152 und 268 erscheinen dort als 118° und 2°.
 ZONE_FIELD_SPECS: dict[str, dict] = {
     "mowHeightLevel": {
         "label": "Schnitthöhe",
@@ -36,22 +36,22 @@ ZONE_FIELD_SPECS: dict[str, dict] = {
         "icon": "mdi:speedometer",
         "observed": "0,4-0,7 m/s",
     },
-    "obstacleHeight": {
-        "label": "Hinderniserkennung",
-        "min": 5, "max": 20, "step": 5,
-        "unit": "cm",
-        "offset": 5, "faktor": 5,
-        "icon": "mdi:sign-caution",
-        "observed": "10 und 15 cm",
-    },
     "angle": {
         "label": "Mährichtung",
-        "min": 0, "max": 360, "step": 1,
+        "min": 0, "max": 180, "step": 1,
         "unit": "°",
-        "offset": 0, "faktor": 1,
+        "offset": 270, "faktor": -1,
         "icon": "mdi:compass",
-        "observed": "90-268°",
+        "observed": "0-180°",
     },
+}
+
+# obstacleHeight ist keine Längenangabe, sondern die Wahl der Umgebung. Stufe 0
+# lässt das Gerät nicht zu, deshalb beginnt die Liste bei 1.
+OBSTACLE_OPTIONS: dict[int, str] = {
+    1: "Flacher Untergrund, kurzes Gras",
+    2: "Normale Umgebung",
+    3: "Hohes Gras",
 }
 
 
@@ -67,3 +67,15 @@ def to_device(field: str, value: float) -> int:
     """Rechnet den angezeigten Wert zurück in die Gerätestufe."""
     spec = ZONE_FIELD_SPECS[field]
     return round((value - spec["offset"]) / spec["faktor"])
+
+
+def obstacle_label(level: int | None) -> str | None:
+    """Der Klartext zu einer obstacleHeight-Stufe."""
+    return OBSTACLE_OPTIONS.get(level) if level is not None else None
+
+
+def obstacle_level(label: str) -> int:
+    """Die Stufe zu einem Klartext; wirft KeyError bei unbekanntem Text."""
+    return next(
+        level for level, text in OBSTACLE_OPTIONS.items() if text == label
+    )

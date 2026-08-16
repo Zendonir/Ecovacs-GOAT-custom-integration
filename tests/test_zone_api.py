@@ -515,17 +515,16 @@ scale = load_component_module("ecovacs_goat", "scale")
 @pytest.mark.parametrize(
     ("field", "level", "shown"),
     [
-        # Am Gerät gegen die App-Anzeige belegt: Höhe und Geschwindigkeit
-        # laufen gegenläufig zur Stufe.
+        # Alle drei Skalen laufen gegenläufig zur Stufe, am Gerät belegt.
         ("mowHeightLevel", 1, 9),
         ("mowHeightLevel", 7, 3),
         ("mowHeightLevel", 5, 5),
         ("cutMode", 1, 0.7),
         ("cutMode", 7, 0.4),
         ("cutMode", 4, 0.55),
-        ("obstacleHeight", 1, 10),
-        ("obstacleHeight", 2, 15),
-        ("angle", 152, 152),
+        ("angle", 270, 0),
+        ("angle", 180, 90),
+        ("angle", 90, 180),
     ],
 )
 def test_levels_map_to_the_values_the_app_shows(field, level, shown):
@@ -535,15 +534,43 @@ def test_levels_map_to_the_values_the_app_shows(field, level, shown):
 
 def test_the_screenshot_of_both_areas_is_reproduced():
     """Mähfläche 1 = areaID 2, Mähfläche 2 = areaID 3 laut App-Anzeige."""
-    area2 = AREA_PARAMETERS[1]  # 5 / 7 / 2
-    area3 = AREA_PARAMETERS[2]  # 3 / 4 / 1
+    area2 = AREA_PARAMETERS[1]  # 5 / 7 / 2 / 152
+    area3 = AREA_PARAMETERS[2]  # 3 / 4 / 1 / 268
     assert scale.to_display("mowHeightLevel", area2["mowHeightLevel"]) == 5
     assert scale.to_display("cutMode", area2["cutMode"]) == 0.4
-    assert scale.to_display("obstacleHeight", area2["obstacleHeight"]) == 15
+    assert scale.to_display("angle", area2["angle"]) == 118
     assert scale.to_display("mowHeightLevel", area3["mowHeightLevel"]) == 7
     assert scale.to_display("cutMode", area3["cutMode"]) == 0.55
-    assert scale.to_display("obstacleHeight", area3["obstacleHeight"]) == 10
+    assert scale.to_display("angle", area3["angle"]) == 2
+
+
+@pytest.mark.parametrize(
+    ("field", "low", "high"),
+    [
+        # Grenzen des Geräts: darüber hinaus lässt sich nichts einstellen.
+        ("mowHeightLevel", 3, 9),
+        ("cutMode", 0.4, 0.7),
+        ("angle", 0, 180),
+    ],
+)
+def test_entity_limits_match_what_the_device_allows(field, low, high):
+    spec = scale.ZONE_FIELD_SPECS[field]
+    assert (spec["min"], spec["max"]) == (low, high)
 
 
 def test_display_of_missing_value_stays_none():
     assert scale.to_display("mowHeightLevel", None) is None
+
+
+def test_obstacle_is_a_choice_not_a_length():
+    """Stufe 0 lässt das Gerät nicht zu, die Liste beginnt bei 1."""
+    assert set(scale.OBSTACLE_OPTIONS) == {1, 2, 3}
+    assert scale.obstacle_label(2) == "Normale Umgebung"
+    assert scale.obstacle_level("Hohes Gras") == 3
+    assert scale.obstacle_label(None) is None
+    assert scale.obstacle_label(0) is None
+
+
+def test_unknown_obstacle_label_raises():
+    with pytest.raises(StopIteration):
+        scale.obstacle_level("Mondlandschaft")
