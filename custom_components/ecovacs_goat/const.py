@@ -55,36 +55,6 @@ class InstanceMode(StrEnum):
 # "Device class '...' not recognized" auftaucht, trägt es hier nach.
 UNSUPPORTED_CLASSES: dict[str, str] = {}
 
-# "min"/"max" sind vorsichtig geschätzt - die echten Grenzen der Ecovacs-App
-# sind nicht bekannt. "observed" hält fest, welche Werte in der Aufzeichnung
-# tatsächlich vorkamen; alles ausserhalb davon ist ungetestet und wird als
-# Attribut an jeder Number-Entity ausgewiesen.
-ZONE_FIELD_SPECS: dict[str, dict] = {
-    # Der Name sagt "Level", der Wert ist aber die Schnitthöhe in Zentimetern:
-    # die Ecovacs-App zeigt für mowHeightLevel 5 bzw. 7 genau "5cm" und "7cm".
-    "mowHeightLevel": {
-        "label": "Schnitthöhe",
-        "min": 1, "max": 11, "step": 1,
-        "unit": "cm",
-        "icon": "mdi:grass", "observed": (3, 7),
-    },
-    "cutMode": {
-        "label": "Mähmodus",
-        "min": 1, "max": 10, "step": 1,
-        "icon": "mdi:tune", "observed": (4, 7),
-    },
-    "obstacleHeight": {
-        "label": "Hinderniserkennung",
-        "min": 0, "max": 3, "step": 1,
-        "icon": "mdi:sign-caution", "observed": (1, 2),
-    },
-    "angle": {
-        "label": "Mährichtung",
-        "min": 0, "max": 360, "step": 1,
-        "icon": "mdi:compass", "observed": (90, 268),
-    },
-}
-
 ZONE_UPDATE_INTERVAL_SECONDS = 120
 # Einstellungen ändern sich selten; entsprechend gemächlich abfragen.
 SETTINGS_INTERVAL_SECONDS = 300

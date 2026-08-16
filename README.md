@@ -91,21 +91,33 @@ Abfragelauf. Das reguläre Abfragen alle zwei Minuten bleibt als Rückfallebene
 bestehen; kennt deebot-client die Nachricht eines Tages selbst, bleibt dessen
 Eintrag unangetastet.
 
-### Wertebereiche
+### Stufen und angezeigte Werte
 
-Die echten Grenzen der Ecovacs-App sind nicht bekannt. Die Min-/Max-Werte sind
-vorsichtig geschätzt; das Attribut `beobachteter_bereich` an jeder
-Number-Entity zeigt, was in der Aufzeichnung real vorkam:
+Der Mäher speichert **Stufen**, die App zeigt physikalische Werte — und bei Höhe
+und Geschwindigkeit laufen beide Skalen **gegenläufig**. Die Entities zeigen und
+nehmen deshalb den Wert der App, umgerechnet über
+`Anzeige = offset + faktor × Stufe` (`scale.py`).
 
-| Parameter | Eingestellt | Beobachtet |
-| --- | --- | --- |
-| `mowHeightLevel` | 1–11 | 1–7 |
-| `cutMode` | 1–10 | 4 / 7 |
-| `obstacleHeight` | 0–3 | 1–2 |
-| `angle` | 0–360 | 90–268 |
+| Feld | Entity | Stufe 1 | Stufe 7 | Umrechnung |
+| --- | --- | --- | --- | --- |
+| `mowHeightLevel` | Schnitthöhe, cm | 9 cm | 3 cm | `cm = 10 − Stufe` |
+| `cutMode` | Geschwindigkeit, m/s | 0,70 | 0,40 | `m/s = 0,75 − 0,05 × Stufe` |
+| `obstacleHeight` | Hinderniserkennung, cm | 10 cm | — | `cm = 5 + 5 × Stufe` |
+| `angle` | Mährichtung, ° | — | — | unverändert |
 
-Werte außerhalb des beobachteten Bereichs sind ungetestet. Anpassbar in
-`const.py` (`ZONE_FIELD_SPECS`).
+Belegt gegen die App-Anzeige zweier Flächen desselben Mähers:
+
+| | Stufen im Gerät | Formel | App zeigte |
+| --- | --- | --- | --- |
+| Mähfläche 1 (`areaID 2`) | 5 / 7 / 2 | 5 cm, 0,40 m/s, 15 cm | 5cm, 0.4m/s, 15cm |
+| Mähfläche 2 (`areaID 3`) | 3 / 4 / 1 | 7 cm, 0,55 m/s, 10 cm | 7cm, 0.55m/s, 10cm |
+
+`cutMode` heißt im Protokoll nach dem Mähmodus, steuert aber die
+Fahrgeschwindigkeit — die Entity heißt deshalb **Geschwindigkeit**.
+
+Die Hindernishöhe ist nur an zwei Punkten belegt (Stufe 1 und 2), ihre Skala
+also extrapoliert. Das Attribut `beobachtet` an jeder Entity nennt den wirklich
+belegten Bereich.
 
 ### Verifiziertes Protokoll
 

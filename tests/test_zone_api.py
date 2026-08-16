@@ -505,3 +505,45 @@ async def test_apply_parameters_drops_removed_zones():
     api.apply_parameters(AREA_PARAMETERS)
     api.apply_parameters(AREA_PARAMETERS[:1])
     assert api.get_cached("2") is None
+
+
+# --- Umrechnung Stufe <-> Anzeige -------------------------------------------
+
+scale = load_component_module("ecovacs_goat", "scale")
+
+
+@pytest.mark.parametrize(
+    ("field", "level", "shown"),
+    [
+        # Am Gerät gegen die App-Anzeige belegt: Höhe und Geschwindigkeit
+        # laufen gegenläufig zur Stufe.
+        ("mowHeightLevel", 1, 9),
+        ("mowHeightLevel", 7, 3),
+        ("mowHeightLevel", 5, 5),
+        ("cutMode", 1, 0.7),
+        ("cutMode", 7, 0.4),
+        ("cutMode", 4, 0.55),
+        ("obstacleHeight", 1, 10),
+        ("obstacleHeight", 2, 15),
+        ("angle", 152, 152),
+    ],
+)
+def test_levels_map_to_the_values_the_app_shows(field, level, shown):
+    assert scale.to_display(field, level) == shown
+    assert scale.to_device(field, shown) == level
+
+
+def test_the_screenshot_of_both_areas_is_reproduced():
+    """Mähfläche 1 = areaID 2, Mähfläche 2 = areaID 3 laut App-Anzeige."""
+    area2 = AREA_PARAMETERS[1]  # 5 / 7 / 2
+    area3 = AREA_PARAMETERS[2]  # 3 / 4 / 1
+    assert scale.to_display("mowHeightLevel", area2["mowHeightLevel"]) == 5
+    assert scale.to_display("cutMode", area2["cutMode"]) == 0.4
+    assert scale.to_display("obstacleHeight", area2["obstacleHeight"]) == 15
+    assert scale.to_display("mowHeightLevel", area3["mowHeightLevel"]) == 7
+    assert scale.to_display("cutMode", area3["cutMode"]) == 0.55
+    assert scale.to_display("obstacleHeight", area3["obstacleHeight"]) == 10
+
+
+def test_display_of_missing_value_stays_none():
+    assert scale.to_display("mowHeightLevel", None) is None

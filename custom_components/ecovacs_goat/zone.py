@@ -34,10 +34,10 @@ from homeassistant.helpers.update_coordinator import (
 
 from .const import (
     DOMAIN,
-    ZONE_FIELD_SPECS,
     ZONE_STATUS_INTERVAL_SECONDS,
     ZONE_UPDATE_INTERVAL_SECONDS,
 )
+from .scale import ZONE_FIELD_SPECS, to_device, to_display
 from .push import AreaParameterEvent, register_message
 from .zone_api import EcovacsZoneApi, ZoneApiError
 
@@ -270,9 +270,8 @@ class EcovacsZoneNumber(CoordinatorEntity, NumberEntity):
         self._attr_native_unit_of_measurement = spec.get("unit")
         self._attr_device_info = _zone_device_info(self._api, zone_id)
 
-        observed_min, observed_max = spec["observed"]
         self._attr_extra_state_attributes = {
-            "beobachteter_bereich": f"{observed_min}-{observed_max}",
+            "beobachtet": spec["observed"],
             "areaID": zone_id,
         }
 
@@ -287,11 +286,14 @@ class EcovacsZoneNumber(CoordinatorEntity, NumberEntity):
         cached = self._api.get_cached(self._zone_id)
         if not cached:
             return None
-        return cached.get(self._field)
+        # Der Mäher speichert Stufen, angezeigt wird der Wert der App.
+        return to_display(self._field, cached.get(self._field))
 
     async def async_set_native_value(self, value: float) -> None:
         """Set a new value."""
-        await self._api.async_set_zone_parameter(self._zone_id, self._field, int(value))
+        await self._api.async_set_zone_parameter(
+            self._zone_id, self._field, to_device(self._field, value)
+        )
         self.async_write_ha_state()
         # Der Mäher quittiert jedes setAreaParameter mit "ok", auch wenn er den
         # Wert nicht übernimmt. Ohne Rückfrage stünde bis zum nächsten regulären
