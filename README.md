@@ -135,8 +135,21 @@ sobald er nötig ist.
 - **Zwei Sitzungen am Konto.** Läuft beides gleichzeitig, hältst du zwei
   MQTT-Verbindungen zum Ecovacs-Konto offen.
 - **`deebot-client`-Version.** Dieser Fork verlangt `18.5.1`; die offizielle
-  Integration kann eine andere Version verlangen. Home Assistant installiert
-  Anforderungen global — bei parallelem Betrieb gewinnt eine davon.
+  Integration pinnt eine andere Version (z. B. `18.4.0`). Home Assistant
+  installiert Anforderungen **global** — bei parallelem Betrieb gewinnt beim
+  Neustart eine davon, und die andere Integration bricht. Symptom:
+
+  ```
+  Setup failed for custom integration 'ecovacs_goat': Unable to import
+  component: cannot import name 'DeviceVerificationRequiredError' from
+  'deebot_client.exceptions'
+  ```
+
+  `DeviceVerificationRequiredError` gibt es erst ab `deebot-client` 18.5.0.
+  Erscheint das, wurde die Bibliothek von der anderen Integration
+  heruntergestuft: eine der beiden entfernen und neu starten. Die Zugangsdaten
+  im Config Entry bleiben davon unberührt — der Eintrag lädt nach dem Neustart
+  von selbst wieder.
 - **Alte Einträge dieser Integration.** Fassungen vor 2.0 setzten auf der
   offiziellen Integration auf und hatten keine eigenen Zugangsdaten. Solche
   Einträge lassen sich nicht migrieren: entfernen und neu hinzufügen.
