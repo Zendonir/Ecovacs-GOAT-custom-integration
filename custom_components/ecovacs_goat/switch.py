@@ -17,6 +17,7 @@ from .entity import (
     EcovacsDescriptionEntity,
     EcovacsEntity,
 )
+from .settings import async_setup_setting_switches
 from .util import get_supported_entities
 
 
@@ -121,6 +122,8 @@ async def async_setup_entry(
     )
     if entities:
         async_add_entities(entities)
+
+    async_setup_setting_switches(config_entry, async_add_entities)
 
 
 class EcovacsSwitchEntity(

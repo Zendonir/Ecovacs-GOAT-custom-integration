@@ -408,3 +408,40 @@ async def test_missing_active_map_raises():
     )
     with pytest.raises(ZoneApiError, match="aktive Karte"):
         await api.async_refresh_area_names()
+
+
+# --- Mäher-Einstellungen -----------------------------------------------------
+
+# Echte Antwort auf getSchedules; das subsets-Feld enthält die einzelnen Zeiten.
+SCHEDULE_SUBSETS = (
+    "XQAABABZAwAAAC2ewEcz16/9k8yt5srPlWFJmNCxlzsfSFsDVcchX9FVOUiTljvFQIOXOM7P"
+    "QbsVbowEURtq+/e7FVoUj7zO1XhIj6THlaBNa0W7/KmcKM+Lmku20o+neb3x3QgcAgkgDmY4"
+    "CMe4C23Wd9NMNy5AuP1b+z3fau3KInStHzwepcEpMRxBWRbhblXgnrl3nrlqKcsliLjrTc75"
+    "qWxXAB8WIRr3aVN5b2J2AA=="
+)
+
+
+def test_schedule_subsets_decompress_to_entries():
+    entries = decompress_subsets(SCHEDULE_SUBSETS)
+    assert len(entries) == 8
+    assert entries[0] == {
+        "ssid": "1", "sDay": 0, "eDay": 0, "sTime": "10:00", "eTime": "16:00",
+        "mowType": 1, "workType": 1, "isOpen": 1,
+    }
+    # Der letzte Eintrag ist das Kantenmähen mit eigener Flächenliste.
+    assert entries[-1]["mowType"] == 3
+    assert entries[-1]["duration"] == 900
+
+
+async def test_send_raw_reaches_the_device():
+    """Einstiegspunkt für Dienst und Einstellungen."""
+    api, device = make_api(responses={"getRainDelay": ok({"enable": 1, "delay": 150})})
+    resp = await api.async_send_raw("getRainDelay")
+    assert api.body_data(resp) == {"enable": 1, "delay": 150}
+    assert device.sent[-1].name == "getRainDelay"
+
+
+async def test_send_raw_passes_the_payload():
+    api, device = make_api()
+    await api.async_send_raw("getPos", {"type": "deebotPos"})
+    assert device.sent[-1].data == {"type": "deebotPos"}

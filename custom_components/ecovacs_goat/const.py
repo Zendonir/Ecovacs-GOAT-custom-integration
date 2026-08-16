@@ -86,4 +86,6 @@ ZONE_FIELD_SPECS: dict[str, dict] = {
 }
 
 ZONE_UPDATE_INTERVAL_SECONDS = 120
+# Einstellungen ändern sich selten; entsprechend gemächlich abfragen.
+SETTINGS_INTERVAL_SECONDS = 300
 ZONE_STATUS_INTERVAL_SECONDS = 60

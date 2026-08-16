@@ -30,6 +30,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import aiohttp_client
 from homeassistant.util.ssl import get_default_no_verify_context
 
+from .settings import SettingsRuntime
 from .zone import ZoneRuntime
 from .const import (
     CONF_OVERRIDE_MQTT_URL,
@@ -49,6 +50,8 @@ class EcovacsController:
         self._devices: list[Device] = []
         # Zonen-Laufzeitdaten je Mäher (did -> ZoneRuntime), von zone.py gefüllt
         self.zones: dict[str, ZoneRuntime] = {}
+        # Mäher-Einstellungen je Mäher (did -> SettingsRuntime), von settings.py gefüllt
+        self.settings: dict[str, SettingsRuntime] = {}
         rest_url = config.get(CONF_OVERRIDE_REST_URL)
         self._device_id = config[CONF_DEVICE_ID]
         country = config[CONF_COUNTRY]

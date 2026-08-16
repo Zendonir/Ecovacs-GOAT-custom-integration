@@ -46,6 +46,7 @@ from .entity import (
     EcovacsEntity,
 )
 from .util import get_name_key, get_options, get_supported_entities
+from .settings import async_setup_setting_sensors
 from .zone import async_setup_zone_sensors
 
 SCAN_INTERVAL = timedelta(seconds=ZONE_STATUS_INTERVAL_SECONDS)
@@ -208,6 +209,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
     async_setup_zone_sensors(config_entry, async_add_entities)
+    async_setup_setting_sensors(config_entry, async_add_entities)
 
 
 class EcovacsSensor(

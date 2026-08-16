@@ -134,6 +134,39 @@ Aus einer echten MQTT-Aufzeichnung abgeleitet:
 Der Status kommt aus `getCleanInfo`, `getBattery` und `getChargeState`. Schlägt
 eines fehl, bleibt nur dessen Wert leer.
 
+## Mäher-Einstellungen
+
+Kommandos, die `deebot-client` nicht kennt; Namen aus einer MQTT-Aufzeichnung
+der App, Antwortformate am Gerät abgefragt (Firmware 1.11.31).
+
+| Entity | Kommando | Antwort |
+| --- | --- | --- |
+| **Regenverzögerung** (Schalter) + **Wartezeit** (Minuten) | `getRainDelay` / `setRainDelay` | `{"enable": 1, "delay": 150}` |
+| **Tierschutz** (Schalter) + **Zeitfenster** (Sensor) | `getAnimProtect` / `setAnimProtect` | `{"enable": 1, "start": "19:0", "end": "7:15"}` |
+| **Richtung wöchentlich wechseln** (Schalter) | `getAutoCutDirection` / `setAutoCutDirection` | `{"enable": 1}` |
+| **Mähplan** (Sensor) | `getSchedules` | `{"list": [{"sid", "name", "subsets": <lzma>}]}` |
+| **Position** (Sensor, standardmäßig aus) | `getPos` `{"type": "deebotPos"}` | `{"deebotPos": {"x", "y", "a", "invalid"}, …}` |
+
+Die `set`-Kommandos erwarten wie `setAreaParameter` immer den vollständigen
+Datensatz; die Integration ergänzt die unveränderten Felder selbst.
+
+Der Mähplan steckt wie die Bereichsnamen in einem LZMA-Feld:
+
+```jsonc
+[{"ssid":"1","sDay":0,"eDay":0,"sTime":"10:00","eTime":"16:00",
+  "mowType":1,"workType":1,"isOpen":1}, …,
+ {"ssid":"8","sDay":1,"sTime":"16:00","eTime":"17:15","mowType":3,
+  "ids":"reid:1;reid:3;…;vid:1","duration":900,"isOpen":1}]
+```
+
+`sDay` zählt ab Montag, `mowType` 1 ist Flächenmähen und 3 Kantenmähen. Der
+Sensor zeigt die Zahl der aktiven Einträge und den ganzen Plan als Attribut.
+Schreiben ist nicht umgesetzt — dafür fehlt eine Aufzeichnung von `setSchedules`.
+
+**Der automatische Richtungswechsel erklärt wandernde Winkel:** Ist er aktiv,
+setzt der Mäher `angle` selbst um, und ein in Home Assistant gesetzter Wert hält
+nicht. Wer die Mährichtung fest vorgeben will, schaltet ihn zuerst ab.
+
 ## Unbekannte Geräteklassen
 
 deebot-client löst die Fähigkeiten über die **Geräteklasse** auf. Fehlt eine

@@ -28,6 +28,7 @@ from .const import CONF_OVERRIDE_REST_URL, DOMAIN, UNSUPPORTED_CLASSES
 from .controller import EcovacsController
 from .registry import RegistrationError, register_classes
 from .services import async_setup_services
+from .settings import async_setup_settings
 from .util import get_client_device_id
 from .zone import async_setup_zones
 
@@ -75,6 +76,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EcovacsConfigEntry) -> b
     entry.runtime_data = controller
 
     await async_setup_zones(hass, entry, controller)
+    await async_setup_settings(hass, entry, controller)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

@@ -26,6 +26,7 @@ from .entity import (
     EcovacsEntity,
 )
 from .util import get_supported_entities
+from .settings import async_setup_setting_numbers
 from .zone import async_setup_zone_numbers
 
 
@@ -107,6 +108,7 @@ async def async_setup_entry(
         async_add_entities(entities)
 
     async_setup_zone_numbers(config_entry, async_add_entities)
+    async_setup_setting_numbers(config_entry, async_add_entities)
 
 
 class EcovacsNumberEntity[EventT: Event](

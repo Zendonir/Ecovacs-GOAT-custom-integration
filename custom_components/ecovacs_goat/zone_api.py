@@ -142,7 +142,8 @@ class EcovacsZoneApi:
         return await self._send(cmd_name, data)
 
     @staticmethod
-    def _body_data(resp: dict[str, Any]) -> dict[str, Any]:
+    def body_data(resp: dict[str, Any]) -> dict[str, Any]:
+        """Der data-Teil einer Antwort, oder {} wenn er fehlt."""
         data = resp.get("body", {}).get("data")
         return data if isinstance(data, dict) else {}
 
@@ -165,7 +166,7 @@ class EcovacsZoneApi:
     async def _async_active_map_id(self) -> str:
         """Die mid der Karte, die der Mäher gerade benutzt."""
         resp = await self._send("getCachedMapInfo")
-        for info in self._body_data(resp).get("info") or []:
+        for info in self.body_data(resp).get("info") or []:
             if info.get("using"):
                 return str(info["mid"])
         raise ZoneApiError("Keine aktive Karte gefunden.")
@@ -180,7 +181,7 @@ class EcovacsZoneApi:
         resp = await self._send(
             "getAreaSet", {"mid": await self._async_active_map_id(), "aid": "0", "type": "ar"}
         )
-        subsets = self._body_data(resp).get("subsets")
+        subsets = self.body_data(resp).get("subsets")
         if not subsets:
             raise ZoneApiError("Karte enthält keine Bereichsdaten.")
 
@@ -211,7 +212,7 @@ class EcovacsZoneApi:
     async def async_refresh_zones(self) -> list[dict[str, Any]]:
         """Lädt alle Zonen-Parameter frisch vom Gerät (getAreaParameter)."""
         resp = await self._send("getAreaParameter", {})
-        params = self._body_data(resp).get("areaParameters") or []
+        params = self.body_data(resp).get("areaParameters") or []
 
         async with self._lock:
             # Vollständig ersetzen, damit in der App gelöschte Zonen nicht als
@@ -290,7 +291,7 @@ class EcovacsZoneApi:
                 status[name] = None
                 _LOGGER.debug("Statusabfrage '%s' fehlgeschlagen: %s", name, result)
             else:
-                status[name] = self._body_data(result)
+                status[name] = self.body_data(result)
 
         if len(errors) == len(names):
             raise ZoneApiError(f"Statusabfrage fehlgeschlagen: {errors[0]}")
