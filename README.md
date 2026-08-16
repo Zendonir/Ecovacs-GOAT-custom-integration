@@ -44,9 +44,35 @@ Aktualisierungslauf automatisch.
 
 ### Zonennamen
 
-Das Geräteprotokoll kennt **keine** Zonennamen — nur numerische `areaID`s. Namen
-wie „Vorgarten" vergibst du in Home Assistant selbst (Gerät umbenennen). Die
-Entity-IDs hängen an der `did` und der `areaID`, Umbenennen bricht also nichts.
+Das Geräteprotokoll kennt **keine** Zonennamen — nur numerische `areaID`s. Am
+Gerät abgefragt (GOAT A1600 LiDAR Pro, Firmware 1.11.31):
+
+| Kommando | Ergebnis |
+| --- | --- |
+| `getAreaParameter` | nur `areaID` + die vier Mähparameter, kein Name |
+| `getCachedMapInfo` | antwortet; `name` ist bei allen Karten leer, und es ist ohnehin der Kartenname |
+| `getAreaSet` `{type: "ar", aid: N}` | antwortet; `subsets` entpackt zu **0 Byte**, für jede `aid` identisch |
+| `getMapSet`, `getMapSet_V2`, `getMapSubSet` | keine Antwort (`errno 500`, „wait for response timed out") |
+
+Die Namen liegen also nicht auf dem Mäher, sondern im Ecovacs-Konto. Sie zu
+holen hieße, die App-REST-API mitzuschneiden — ein anderer Angriffspunkt als der
+Gerätekanal, über den diese Integration läuft.
+
+**Zuordnung von Hand:** Setze in Home Assistant für eine Zone eine auffällige
+Schnitthöhe und sieh in der App nach, welche benannte Zone sich geändert hat
+(Zonendialog schließen und neu öffnen, die App cacht). So ist in wenigen Minuten
+klar, welche `areaID` zu welchem Namen gehört; danach das Gerät in Home
+Assistant umbenennen. Die Entity-IDs hängen an der `did` und der `areaID`,
+Umbenennen bricht also nichts.
+
+### Zonen, die es nicht mehr gibt
+
+`getAreaParameter` liefert offenbar auch Einträge gelöschter Zonen: Im Testgerät
+kamen drei Datensätze zurück, obwohl in der App nur zwei Zonen angelegt waren.
+Alle drei nennen `mid: "0"`, während die aktive Karte `mid: "1"` ist. Die
+Integration kann echte nicht von verwaisten Zonen unterscheiden und legt für
+jeden Datensatz ein Gerät an. Überzählige Zonen-Geräte lassen sich in Home
+Assistant deaktivieren.
 
 ### Wertebereiche
 
