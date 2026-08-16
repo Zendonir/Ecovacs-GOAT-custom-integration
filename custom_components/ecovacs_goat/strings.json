@@ -2,24 +2,30 @@
   "config": {
     "step": {
       "user": {
-        "title": "Ecovacs GOAT support",
-        "description": "Adds support for GOAT models that deebot-client does not recognise yet: {models}.\n\nThe Ecovacs integration is reloaded afterwards so the mower's entities appear."
+        "title": "Ecovacs GOAT",
+        "description": "Macht GOAT-Modelle nutzbar, die deebot-client noch nicht kennt ({models}), und ergänzt die Zonensteuerung.\n\nNutzt die Verbindung der bereits eingerichteten Ecovacs-Integration mit — es wird keine zweite Anmeldung aufgebaut. Die Ecovacs-Integration wird dabei einmal neu geladen.\n\nDas Gerätefeld nur ausfüllen, wenn mehrere Ecovacs-Geräte im Konto sind.",
+        "data": {
+          "device_name": "Gerätename (optional)"
+        },
+        "data_description": {
+          "device_name": "Teil des Gerätenamens, z. B. „iHans“. Leer lassen, um das erste gefundene Gerät zu verwenden."
+        }
       }
     },
     "abort": {
-      "already_configured": "Ecovacs GOAT support is already set up.",
-      "ecovacs_not_configured": "Set up the Ecovacs integration with your Ecovacs account first."
+      "already_configured": "Die Ecovacs-GOAT-Integration ist bereits eingerichtet.",
+      "ecovacs_not_configured": "Bitte zuerst die offizielle Ecovacs-Integration mit deinem Ecovacs-Konto einrichten."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Additional device classes",
+        "title": "Weitere Geräteklassen",
         "data": {
-          "extra_classes": "Extra device classes"
+          "extra_classes": "Zusätzliche Geräteklassen"
         },
         "data_description": {
-          "extra_classes": "Space or comma separated device classes to register in addition to the built-in list, for example another GOAT model reported as unsupported in your log."
+          "extra_classes": "Mit Leerzeichen oder Komma getrennte Geräteklassen, die zusätzlich angemeldet werden — zum Beispiel ein weiteres GOAT-Modell, das im Log als nicht unterstützt gemeldet wird."
         }
       }
     }

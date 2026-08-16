@@ -2,13 +2,19 @@
   "config": {
     "step": {
       "user": {
-        "title": "Ecovacs GOAT support",
-        "description": "Adds support for GOAT models that deebot-client does not recognise yet: {models}.\n\nThe Ecovacs integration is reloaded afterwards so the mower's entities appear."
+        "title": "Ecovacs GOAT",
+        "description": "Makes GOAT models work that deebot-client does not recognise yet ({models}), and adds zone control.\n\nReuses the connection of the Ecovacs integration you already set up — no second login is created. The Ecovacs integration is reloaded once during setup.\n\nOnly fill in the device field if your account has more than one Ecovacs device.",
+        "data": {
+          "device_name": "Device name (optional)"
+        },
+        "data_description": {
+          "device_name": "Part of the device name, e.g. \"iHans\". Leave empty to use the first device found."
+        }
       }
     },
     "abort": {
-      "already_configured": "Ecovacs GOAT support is already set up.",
-      "ecovacs_not_configured": "Set up the Ecovacs integration with your Ecovacs account first."
+      "already_configured": "The Ecovacs GOAT integration is already set up.",
+      "ecovacs_not_configured": "Set up the official Ecovacs integration with your Ecovacs account first."
     }
   },
   "options": {

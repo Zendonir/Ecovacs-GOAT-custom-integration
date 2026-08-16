@@ -15,40 +15,41 @@ if TYPE_CHECKING:
     from homeassistant.helpers.entity import Entity
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-    from . import EcovacsZonesConfigEntry
+    from . import EcovacsGoatConfigEntry
     from .zone_api import EcovacsZoneApi
 
 
 def zone_device_info(api: EcovacsZoneApi, zone_id: str) -> DeviceInfo:
     """Gerät für eine einzelne Zone."""
     return DeviceInfo(
-        identifiers={(DOMAIN, f"zone_{zone_id}")},
-        name=f"Mäher Zone {zone_id}",
+        identifiers={(DOMAIN, f"{api.device_id}_zone_{zone_id}")},
+        name=f"{api.device_label} Zone {zone_id}",
         manufacturer="Ecovacs",
-        model=api.device_label,
+        model=api.model,
     )
 
 
 def controller_device_info(api: EcovacsZoneApi) -> DeviceInfo:
     """Gerät für die zonenübergreifenden Entities."""
     return DeviceInfo(
-        identifiers={(DOMAIN, "controller")},
-        name="Mäher Zonensteuerung",
+        identifiers={(DOMAIN, f"{api.device_id}_controller")},
+        name=f"{api.device_label} Zonensteuerung",
         manufacturer="Ecovacs",
-        model=api.device_label,
+        model=api.model,
     )
 
 
 @callback
 def async_setup_zone_entities(
-    entry: EcovacsZonesConfigEntry,
+    entry: EcovacsGoatConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
     factory: Callable[[str], Iterable[Entity]],
 ) -> None:
     """Legt Entities je Zone an - auch für Zonen, die erst später dazukommen.
 
     Wer in der Ecovacs-App eine Zone ergänzt, bekommt sie so beim nächsten
-    Aktualisierungslauf automatisch, ohne die Integration neu zu laden.
+    Aktualisierungslauf automatisch, ohne die Integration neu zu laden. Das
+    deckt auch den Fall ab, dass beim Einrichten noch keine Zonen abrufbar waren.
     """
     coordinator = entry.runtime_data.coordinator
     known: set[str] = set()

@@ -16,7 +16,7 @@ from .zone_api import ZoneApiError
 if TYPE_CHECKING:
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-    from . import EcovacsZonesConfigEntry
+    from . import EcovacsGoatConfigEntry
     from .zone_api import EcovacsZoneApi
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ SCAN_INTERVAL = timedelta(seconds=STATUS_INTERVAL_SECONDS)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: EcovacsZonesConfigEntry,
+    entry: EcovacsGoatConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the status sensor."""
@@ -37,11 +37,11 @@ class EcovacsZoneStatusSensor(SensorEntity):
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:map-marker-path"
-    _attr_unique_id = "ecovacs_zone_status"
-    _attr_name = "Zonen-Mähstatus"
+    _attr_name = "Mähstatus"
 
     def __init__(self, api: EcovacsZoneApi) -> None:
         self._api = api
+        self._attr_unique_id = f"{api.device_id}_zone_status"
         self._attr_native_value: str | None = None
         self._attr_extra_state_attributes: dict[str, Any] = {}
         self._attr_device_info = controller_device_info(api)

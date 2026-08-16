@@ -69,6 +69,11 @@ class EcovacsZoneApi:
         return str(info.get("nick") or info.get("deviceName") or "Mäher")
 
     @property
+    def model(self) -> str:
+        """Die Modellbezeichnung, z.B. 'GOAT A1600 LiDAR Pro'."""
+        return str(self._device.device_info.get("deviceName") or "GOAT")
+
+    @property
     def device_id(self) -> str:
         """Die did des Mähers - eindeutig pro Gerät im Ecovacs-Konto."""
         return str(self._device.device_info["did"])

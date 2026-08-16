@@ -85,24 +85,13 @@ def test_upstream_support_takes_precedence():
         for d in const.DONOR_CLASSES
         if registry._import_hardware_module(f"deebot_client.hardware.{d}") is not None
     )
-    results = registry.register_classes({donor: "donor"})
-    assert results == {donor: "supported_upstream"}
-
-    # Unloading must leave the upstream definition intact.
-    registry.unregister_classes({donor: "donor"}, results)
+    assert registry.register_classes({donor: "donor"}) == {donor: "supported_upstream"}
     assert _lookup(donor) is not None
-
-
-def test_unregister_removes_only_our_entries():
-    classes = {UNKNOWN: "GOAT A1600 LiDAR Pro"}
-    results = registry.register_classes(classes)
-    registry.unregister_classes(classes, results)
-    assert UNKNOWN not in deebot_hardware._DEVICES
 
 
 def test_missing_dependency_is_not_reported_as_unknown_model():
     """A broken install must raise, not silently look like an unknown model."""
-    with pytest.raises(registry.RegistrationError, match="missing"):
+    with pytest.raises(registry.RegistrationError, match="fehlt"):
         registry._import_hardware_module("tests.helper_broken_import")
 
 

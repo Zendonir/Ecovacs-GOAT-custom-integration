@@ -1,4 +1,4 @@
-"""Tests für die Zonen-Protokollschicht (custom_components/ecovacs_zones).
+"""Tests für die Zonen-Protokollschicht (custom_components/ecovacs_goat).
 
 Prüft die gesendeten Kommandos gegen das per MQTT-Aufzeichnung verifizierte
 GOAT-Protokoll und die Auswertung der Antworten.
@@ -15,7 +15,7 @@ from tests.conftest import load_component_module
 
 pytest.importorskip("deebot_client")
 
-zone_api = load_component_module("ecovacs_zones", "zone_api")
+zone_api = load_component_module("ecovacs_goat", "zone_api")
 
 EcovacsZoneApi = zone_api.EcovacsZoneApi
 ZoneApiError = zone_api.ZoneApiError
@@ -300,7 +300,15 @@ async def test_payload_matches_the_builtin_json_command_format():
     assert set(device.sent[-1].payload["header"]) == set(builtin["header"])
 
 
-async def test_device_label_and_id():
+async def test_device_label_id_and_model():
+    """Anzeigename, did (für eindeutige Entity-IDs) und Modell."""
     api, _ = make_api()
     assert api.device_label == "iHans V 2.0"
     assert api.device_id == "87a9557f-1411-4a6d-9ffb-62ab597a5506"
+    assert api.model == "GOAT A1600 LiDAR Pro"
+
+
+async def test_device_label_falls_back_to_model_without_nickname():
+    api, device = make_api()
+    del device.device_info["nick"]
+    assert api.device_label == "GOAT A1600 LiDAR Pro"

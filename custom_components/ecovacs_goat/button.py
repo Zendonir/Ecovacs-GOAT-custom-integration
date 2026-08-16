@@ -12,13 +12,13 @@ from .entity import async_setup_zone_entities, controller_device_info, zone_devi
 if TYPE_CHECKING:
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-    from . import EcovacsZonesConfigEntry
+    from . import EcovacsGoatConfigEntry
     from .zone_api import EcovacsZoneApi
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: EcovacsZonesConfigEntry,
+    entry: EcovacsGoatConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the zone buttons."""
@@ -37,12 +37,12 @@ class EcovacsZoneStartButton(ButtonEntity):
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:play"
+    _attr_name = "Mähen starten"
 
     def __init__(self, api: EcovacsZoneApi, zone_id: str) -> None:
         self._api = api
         self._zone_id = zone_id
-        self._attr_unique_id = f"ecovacs_zone_{zone_id}_start"
-        self._attr_name = f"Zone {zone_id} Mähen starten"
+        self._attr_unique_id = f"{api.device_id}_zone_{zone_id}_start"
         self._attr_device_info = zone_device_info(api, zone_id)
 
     async def async_press(self) -> None:
@@ -50,15 +50,15 @@ class EcovacsZoneStartButton(ButtonEntity):
 
 
 class EcovacsZoneStopButton(ButtonEntity):
-    """Stoppt das aktuell laufende Zonenmähen (geräteweit, nicht zonenspezifisch)."""
+    """Stoppt das laufende Zonenmähen (geräteweit, nicht zonenspezifisch)."""
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:stop"
-    _attr_unique_id = "ecovacs_zone_stop"
     _attr_name = "Zonenmähen stoppen"
 
     def __init__(self, api: EcovacsZoneApi) -> None:
         self._api = api
+        self._attr_unique_id = f"{api.device_id}_zone_stop"
         self._attr_device_info = controller_device_info(api)
 
     async def async_press(self) -> None:

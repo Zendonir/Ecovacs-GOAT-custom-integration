@@ -1,16 +1,23 @@
-"""Constants for the Ecovacs GOAT support integration."""
+"""Konstanten für die Ecovacs-GOAT-Integration."""
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Any, Final
 
 DOMAIN: Final = "ecovacs_goat"
 ECOVACS_DOMAIN: Final = "ecovacs"
 
-# Device classes that ship with a capability definition in deebot-client and are
-# used as the blueprint for models that do not have one yet. All GOAT definitions
-# in deebot-client are identical apart from their docstring, so any of them works;
-# they are tried in order and the first importable one wins.
+CONF_DEVICE_NAME: Final = "device_name"
+CONF_EXTRA_CLASSES: Final = "extra_classes"
+
+PLATFORMS: Final = ["number", "button", "sensor"]
+
+# --- Geräteklassen -----------------------------------------------------------
+
+# Geräteklassen, für die deebot-client eine Capability-Definition mitbringt. Sie
+# dienen als Vorlage für Modelle, die noch keine haben. Alle GOAT-Definitionen in
+# deebot-client sind bis auf ihren Docstring identisch, es passt also jede; sie
+# werden der Reihe nach probiert, die erste importierbare gewinnt.
 DONOR_CLASSES: Final[tuple[str, ...]] = (
     "51rcxt",  # GOAT A3000 LiDAR Pro
     "xmp9ds",  # GOAT A1600 RTK
@@ -19,10 +26,56 @@ DONOR_CLASSES: Final[tuple[str, ...]] = (
     "5xu9h3",  # GOAT G1
 )
 
-# GOAT models that deebot-client does not recognise yet. Each is registered with
-# the capability set of a donor class above.
+# GOAT-Modelle, die deebot-client noch nicht kennt. Jedes wird mit dem
+# Capability-Satz einer Vorlage von oben angemeldet.
 UNSUPPORTED_CLASSES: Final[dict[str, str]] = {
     "e4gqia": "GOAT A1600 LiDAR Pro",
 }
 
-CONF_EXTRA_CLASSES: Final = "extra_classes"
+# --- Zonenparameter ----------------------------------------------------------
+
+# Aus dem Reverse Engineering des GOAT-Protokolls bekannte Pflichtfelder für
+# setAreaParameter. Namen exakt wie von der Ecovacs-App gesendet.
+AREA_PARAM_FIELDS: Final = ("mowHeightLevel", "cutMode", "obstacleHeight", "angle")
+
+# Die Grenzwerte ("min"/"max") sind vorsichtig geschätzt - die echten Grenzen der
+# Ecovacs-App sind nicht bekannt. "observed" hält fest, welche Werte in der
+# MQTT-Aufzeichnung tatsächlich vorkamen; alles ausserhalb davon ist ungetestet.
+# Der beobachtete Bereich wird als Attribut an jeder Number-Entity ausgewiesen.
+FIELD_SPECS: Final[dict[str, dict[str, Any]]] = {
+    "mowHeightLevel": {
+        "label": "Schnitthöhe",
+        "min": 1,
+        "max": 11,
+        "step": 1,
+        "icon": "mdi:grass",
+        "observed": (3, 5),
+    },
+    "cutMode": {
+        "label": "Mähmodus",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+        "icon": "mdi:tune",
+        "observed": (4, 7),
+    },
+    "obstacleHeight": {
+        "label": "Hinderniserkennung",
+        "min": 0,
+        "max": 3,
+        "step": 1,
+        "icon": "mdi:sign-caution",
+        "observed": (1, 2),
+    },
+    "angle": {
+        "label": "Mährichtung",
+        "min": 0,
+        "max": 360,
+        "step": 1,
+        "icon": "mdi:compass",
+        "observed": (90, 268),
+    },
+}
+
+UPDATE_INTERVAL_SECONDS: Final = 120
+STATUS_INTERVAL_SECONDS: Final = 60

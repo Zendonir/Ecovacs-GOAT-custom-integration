@@ -1,4 +1,4 @@
-"""Config flow for Ecovacs GOAT support."""
+"""Config flow für die Ecovacs-GOAT-Integration."""
 
 from __future__ import annotations
 
@@ -14,16 +14,24 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import callback
 
-from .const import CONF_EXTRA_CLASSES, DOMAIN, ECOVACS_DOMAIN, UNSUPPORTED_CLASSES
+from .const import (
+    CONF_DEVICE_NAME,
+    CONF_EXTRA_CLASSES,
+    DOMAIN,
+    ECOVACS_DOMAIN,
+    UNSUPPORTED_CLASSES,
+)
+
+STEP_USER_SCHEMA = vol.Schema({vol.Optional(CONF_DEVICE_NAME): str})
 
 
 def _parse_classes(raw: str) -> list[str]:
-    """Split a comma or whitespace separated list of device classes."""
+    """Zerlegt eine mit Komma oder Leerzeichen getrennte Liste von Klassen."""
     return [part for part in raw.replace(",", " ").split() if part]
 
 
-class GoatConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle the config flow."""
+class EcovacsGoatConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Ein-Schritt-Flow: optional ein Gerät eingrenzen, sonst nichts zu tun."""
 
     VERSION = 1
 
@@ -38,24 +46,33 @@ class GoatConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="ecovacs_not_configured")
 
         if user_input is None:
-            models = ", ".join(UNSUPPORTED_CLASSES.values())
+            # Absichtlich ohne Geräteprüfung: solange die Geräteklasse nicht
+            # angemeldet ist, kennt die Ecovacs-Integration den Mäher gar nicht -
+            # genau der Fall, für den diese Integration da ist. Das Gerät wird
+            # erst beim Einrichten gesucht, nach der Anmeldung.
             return self.async_show_form(
                 step_id="user",
-                data_schema=vol.Schema({}),
-                description_placeholders={"models": models},
+                data_schema=STEP_USER_SCHEMA,
+                description_placeholders={
+                    "models": ", ".join(UNSUPPORTED_CLASSES.values())
+                },
             )
 
-        return self.async_create_entry(title="Ecovacs GOAT support", data={})
+        data = {}
+        if device_name := user_input.get(CONF_DEVICE_NAME):
+            data[CONF_DEVICE_NAME] = device_name
+
+        return self.async_create_entry(title="Ecovacs GOAT", data=data)
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
         """Return the options flow."""
-        return GoatOptionsFlow()
+        return EcovacsGoatOptionsFlow()
 
 
-class GoatOptionsFlow(OptionsFlow):
-    """Allow registering further device classes without a code change."""
+class EcovacsGoatOptionsFlow(OptionsFlow):
+    """Erlaubt weitere Geräteklassen ohne Codeänderung."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

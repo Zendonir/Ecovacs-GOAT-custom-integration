@@ -14,13 +14,13 @@ from .entity import async_setup_zone_entities, zone_device_info
 if TYPE_CHECKING:
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-    from . import EcovacsZonesConfigEntry
+    from . import EcovacsGoatConfigEntry
     from .zone_api import EcovacsZoneApi
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: EcovacsZonesConfigEntry,
+    entry: EcovacsGoatConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the zone number entities."""
@@ -50,8 +50,10 @@ class EcovacsZoneNumber(CoordinatorEntity, NumberEntity):
         self._field = field
         spec = FIELD_SPECS[field]
 
-        self._attr_unique_id = f"ecovacs_zone_{zone_id}_{field}"
-        self._attr_name = f"Zone {zone_id} {spec['label']}"
+        self._attr_unique_id = f"{api.device_id}_zone_{zone_id}_{field}"
+        # has_entity_name stellt den Gerätenamen ("... Zone 2") voran, hier steht
+        # deshalb nur der Parameter.
+        self._attr_name = spec["label"]
         self._attr_icon = spec["icon"]
         self._attr_native_min_value = spec["min"]
         self._attr_native_max_value = spec["max"]
@@ -80,7 +82,5 @@ class EcovacsZoneNumber(CoordinatorEntity, NumberEntity):
         return cached.get(self._field)
 
     async def async_set_native_value(self, value: float) -> None:
-        await self._api.async_set_zone_parameter(
-            self._zone_id, self._field, int(value)
-        )
+        await self._api.async_set_zone_parameter(self._zone_id, self._field, int(value))
         self.async_write_ha_state()

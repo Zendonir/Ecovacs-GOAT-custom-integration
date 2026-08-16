@@ -2,13 +2,19 @@
   "config": {
     "step": {
       "user": {
-        "title": "Ecovacs GOAT Unterstützung",
-        "description": "Ergänzt Unterstützung für GOAT-Modelle, die deebot-client noch nicht kennt: {models}.\n\nAnschließend wird die Ecovacs-Integration neu geladen, damit die Entities des Mähers erscheinen."
+        "title": "Ecovacs GOAT",
+        "description": "Macht GOAT-Modelle nutzbar, die deebot-client noch nicht kennt ({models}), und ergänzt die Zonensteuerung.\n\nNutzt die Verbindung der bereits eingerichteten Ecovacs-Integration mit — es wird keine zweite Anmeldung aufgebaut. Die Ecovacs-Integration wird dabei einmal neu geladen.\n\nDas Gerätefeld nur ausfüllen, wenn mehrere Ecovacs-Geräte im Konto sind.",
+        "data": {
+          "device_name": "Gerätename (optional)"
+        },
+        "data_description": {
+          "device_name": "Teil des Gerätenamens, z. B. „iHans“. Leer lassen, um das erste gefundene Gerät zu verwenden."
+        }
       }
     },
     "abort": {
-      "already_configured": "Ecovacs GOAT Unterstützung ist bereits eingerichtet.",
-      "ecovacs_not_configured": "Richte zuerst die Ecovacs-Integration mit deinem Ecovacs-Konto ein."
+      "already_configured": "Die Ecovacs-GOAT-Integration ist bereits eingerichtet.",
+      "ecovacs_not_configured": "Bitte zuerst die offizielle Ecovacs-Integration mit deinem Ecovacs-Konto einrichten."
     }
   },
   "options": {
@@ -19,7 +25,7 @@
           "extra_classes": "Zusätzliche Geräteklassen"
         },
         "data_description": {
-          "extra_classes": "Mit Leerzeichen oder Komma getrennte Geräteklassen, die zusätzlich zur eingebauten Liste registriert werden — zum Beispiel ein weiteres GOAT-Modell, das im Log als nicht unterstützt gemeldet wird."
+          "extra_classes": "Mit Leerzeichen oder Komma getrennte Geräteklassen, die zusätzlich angemeldet werden — zum Beispiel ein weiteres GOAT-Modell, das im Log als nicht unterstützt gemeldet wird."
         }
       }
     }

@@ -1,13 +1,14 @@
 {
   "domain": "ecovacs_goat",
-  "name": "Ecovacs GOAT Support",
+  "name": "Ecovacs GOAT",
   "codeowners": [],
   "config_flow": true,
   "dependencies": ["ecovacs"],
   "documentation": "https://github.com/zendonir/ecovacs-goat-custom-integration",
-  "integration_type": "service",
-  "iot_class": "cloud_push",
+  "integration_type": "device",
+  "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/zendonir/ecovacs-goat-custom-integration/issues",
   "loggers": ["deebot_client"],
-  "version": "0.1.0"
+  "requirements": [],
+  "version": "1.0.0"
 }

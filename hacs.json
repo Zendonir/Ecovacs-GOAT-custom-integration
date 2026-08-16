@@ -1,5 +1,5 @@
 {
-  "name": "Ecovacs GOAT Support",
+  "name": "Ecovacs GOAT",
   "content_in_root": false,
   "render_readme": true,
   "homeassistant": "2024.12.0"
