@@ -1,0 +1,27 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Ecovacs GOAT support",
+        "description": "Adds support for GOAT models that deebot-client does not recognise yet: {models}.\n\nThe Ecovacs integration is reloaded afterwards so the mower's entities appear."
+      }
+    },
+    "abort": {
+      "already_configured": "Ecovacs GOAT support is already set up.",
+      "ecovacs_not_configured": "Set up the Ecovacs integration with your Ecovacs account first."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Additional device classes",
+        "data": {
+          "extra_classes": "Extra device classes"
+        },
+        "data_description": {
+          "extra_classes": "Space or comma separated device classes to register in addition to the built-in list, for example another GOAT model reported as unsupported in your log."
+        }
+      }
+    }
+  }
+}
