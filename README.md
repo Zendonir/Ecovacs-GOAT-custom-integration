@@ -60,21 +60,12 @@ Gerätekanal, über den diese Integration läuft. Die App selbst vergibt ohnehin
 nur generische Namen („Mähfläche 1", „Mähfläche 2"), solange man sie nicht
 umbenennt.
 
-**Zuordnung von Hand:** Setze in Home Assistant für eine Zone eine auffällige
-Schnitthöhe und sieh in der App nach, welche Mähfläche sich geändert hat
-(Zonendialog schließen und neu öffnen, die App cacht). Achtung: die Nummern
-stimmen nicht überein — im Testgerät war `areaID 1` die „Mähfläche 2" und
-`areaID 2` die „Mähfläche 1". Danach das Gerät in Home Assistant umbenennen; die
-Entity-IDs hängen an der `did` und der `areaID`, Umbenennen bricht also nichts.
-
-### Zonen, die es nicht mehr gibt
-
-`getAreaParameter` liefert offenbar auch Einträge gelöschter Zonen: Im Testgerät
-kamen drei Datensätze zurück, obwohl in der App nur zwei Zonen angelegt waren.
-Alle drei nennen `mid: "0"`, während die aktive Karte `mid: "1"` ist. Die
-Integration kann echte nicht von verwaisten Zonen unterscheiden und legt für
-jeden Datensatz ein Gerät an. Überzählige Zonen-Geräte lassen sich in Home
-Assistant deaktivieren.
+**Zuordnung von Hand:** Am einfachsten von der App aus — dort einen Wert ändern
+und danach `getAreaParameter` lesen (Dienst `ecovacs_goat.send_command`); die
+`areaID`, die sich rührt, gehört zu dieser Mähfläche. Die Nummern stimmen nicht
+überein, und verwaiste Datensätze liegen dazwischen (siehe unten). Danach das
+Gerät in Home Assistant umbenennen; die Entity-IDs hängen an der `did` und der
+`areaID`, Umbenennen bricht also nichts.
 
 ### Wertebereiche
 
@@ -84,7 +75,7 @@ Number-Entity zeigt, was in der Aufzeichnung real vorkam:
 
 | Parameter | Eingestellt | Beobachtet |
 | --- | --- | --- |
-| `mowHeightLevel` (cm) | 1–11 | 3–7 |
+| `mowHeightLevel` | 1–11 | 1–7 |
 | `cutMode` | 1–10 | 4 / 7 |
 | `obstacleHeight` | 0–3 | 1–2 |
 | `angle` | 0–360 | 90–268 |
@@ -92,36 +83,24 @@ Number-Entity zeigt, was in der Aufzeichnung real vorkam:
 Werte außerhalb des beobachteten Bereichs sind ungetestet. Anpassbar in
 `const.py` (`ZONE_FIELD_SPECS`).
 
-### Ungeklärt: wirkt setAreaParameter überhaupt?
+### Verwaiste Bereiche
 
-**Die Zonenparameter sind nicht als wirksam bestätigt.** Am Testgerät gilt:
+`getAreaParameter` liefert auch Datensätze, die zu keiner Mähfläche der App mehr
+gehören. Am Testgerät kamen drei Datensätze für zwei Flächen zurück.
 
-* `setAreaParameter` wird mit `code 0` quittiert, und `mowHeightLevel` bleibt
-  über Stunden und viele Abfragen hinweg stehen — geschrieben wird also etwas.
-* In der Ecovacs-App ändert sich dadurch **nichts**, weder Schnitthöhe noch
-  Winkel.
-* `angle` bleibt nicht stehen: für den beschriebenen Bereich wanderte er von 180
-  über 20 auf 50, während der Mäher angedockt war. Die anderen Bereiche
-  behielten ihre Werte.
-* `getAreaSet` meldet für alle Bereiche `mid: "0"`, aktiv ist laut
-  `getCachedMapInfo` aber `mid: "1"`. Ein `mid` im Aufruf von
-  `getAreaParameter` wird ignoriert.
+Der Nachweis: Nach einer Änderung **in der App** änderten sich `areaID 2` und
+`areaID 3` in allen Feldern, während `areaID 1` exakt den Wert behielt, den diese
+Integration Stunden zuvor hineingeschrieben hatte. Die App und diese Integration
+schreiben also in dieselbe Tabelle — der verwaiste Datensatz nimmt Schreibvorgänge
+nur folgenlos entgegen.
 
-Das deutet darauf hin, dass diese Tabelle zu einer **älteren Karte** gehört und
-nicht die ist, aus der die App und der laufende Mähauftrag ihre Werte nehmen.
-Bestätigt ist das nicht.
+Die Integration kann echte nicht von verwaisten Bereichen unterscheiden und legt
+für jeden Datensatz ein Gerät an. Welcher Bereich verwaist ist, findet man so:
+einen auffälligen Wert setzen und prüfen, ob er in der App auftaucht — oder
+umgekehrt in der App etwas ändern und sehen, welche `areaID` sich rührt. Das
+überzählige Zonen-Gerät lässt sich in Home Assistant deaktivieren.
 
-Der entscheidende Test steht aus: eine Schnitthöhe **in der App** ändern und
-danach `getAreaParameter` lesen. Folgt der Gerätewert, ist es dieselbe Tabelle
-und die App zeigt nur veraltet an; ändert sich nichts, schreibt die App
-woandershin und die Zonenparameter dieser Integration laufen ins Leere.
-
-Unberührt davon sind Start und Stopp einzelner Zonen (`clean` mit `spotArea`) —
-die stammen aus einer MQTT-Aufzeichnung eines echten App-Vorgangs.
-
-Ob `mowHeightLevel` Zentimeter meint, ist damit ebenfalls offen: die App zeigte
-„5cm" und „7cm" bei gespeicherten 5 und 7, was passt, aber ohne die
-Gegenprobe Zufall sein kann. Die Entity trägt die Einheit vorerst aus.
+Achtung: Die Nummern der App entsprechen nicht den `areaID`s.
 
 ### Verifiziertes Protokoll
 
