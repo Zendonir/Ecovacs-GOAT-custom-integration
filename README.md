@@ -107,25 +107,6 @@ Number-Entity zeigt, was in der Aufzeichnung real vorkam:
 Werte außerhalb des beobachteten Bereichs sind ungetestet. Anpassbar in
 `const.py` (`ZONE_FIELD_SPECS`).
 
-### Verwaiste Bereiche
-
-`getAreaParameter` liefert auch Datensätze, die zu keiner Mähfläche der App mehr
-gehören. Am Testgerät kamen drei Datensätze für zwei Flächen zurück.
-
-Der Nachweis: Nach einer Änderung **in der App** änderten sich `areaID 2` und
-`areaID 3` in allen Feldern, während `areaID 1` exakt den Wert behielt, den diese
-Integration Stunden zuvor hineingeschrieben hatte. Die App und diese Integration
-schreiben also in dieselbe Tabelle — der verwaiste Datensatz nimmt Schreibvorgänge
-nur folgenlos entgegen.
-
-Die Integration kann echte nicht von verwaisten Bereichen unterscheiden und legt
-für jeden Datensatz ein Gerät an. Welcher Bereich verwaist ist, findet man so:
-einen auffälligen Wert setzen und prüfen, ob er in der App auftaucht — oder
-umgekehrt in der App etwas ändern und sehen, welche `areaID` sich rührt. Das
-überzählige Zonen-Gerät lässt sich in Home Assistant deaktivieren.
-
-Achtung: Die Nummern der App entsprechen nicht den `areaID`s.
-
 ### Verifiziertes Protokoll
 
 Aus einer echten MQTT-Aufzeichnung abgeleitet:
