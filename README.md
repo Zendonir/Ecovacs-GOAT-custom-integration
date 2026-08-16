@@ -92,15 +92,36 @@ Number-Entity zeigt, was in der Aufzeichnung real vorkam:
 Werte außerhalb des beobachteten Bereichs sind ungetestet. Anpassbar in
 `const.py` (`ZONE_FIELD_SPECS`).
 
-`mowHeightLevel` ist trotz des Namens **keine Stufe, sondern die Schnitthöhe in
-Zentimetern**: die App zeigt für die Werte 5 und 7 genau „5cm" und „7cm". Die
-Entity trägt die Einheit deshalb aus.
+### Ungeklärt: wirkt setAreaParameter überhaupt?
 
-Offen: Die App zeigt je Fläche auch eine Hindernishöhe (10 cm bzw. 15 cm),
-während `obstacleHeight` bei beiden Flächen `2` ist — dieser Wert lässt sich
-also nicht so direkt lesen wie die Schnitthöhe. Auch die Winkelangaben der App
-(118°, 2°) passen nicht zu den gespeicherten `angle`-Werten (152, 180); die
-Option „Ändere die Mährichtung wöchentlich" dürfte dabei mitspielen.
+**Die Zonenparameter sind nicht als wirksam bestätigt.** Am Testgerät gilt:
+
+* `setAreaParameter` wird mit `code 0` quittiert, und `mowHeightLevel` bleibt
+  über Stunden und viele Abfragen hinweg stehen — geschrieben wird also etwas.
+* In der Ecovacs-App ändert sich dadurch **nichts**, weder Schnitthöhe noch
+  Winkel.
+* `angle` bleibt nicht stehen: für den beschriebenen Bereich wanderte er von 180
+  über 20 auf 50, während der Mäher angedockt war. Die anderen Bereiche
+  behielten ihre Werte.
+* `getAreaSet` meldet für alle Bereiche `mid: "0"`, aktiv ist laut
+  `getCachedMapInfo` aber `mid: "1"`. Ein `mid` im Aufruf von
+  `getAreaParameter` wird ignoriert.
+
+Das deutet darauf hin, dass diese Tabelle zu einer **älteren Karte** gehört und
+nicht die ist, aus der die App und der laufende Mähauftrag ihre Werte nehmen.
+Bestätigt ist das nicht.
+
+Der entscheidende Test steht aus: eine Schnitthöhe **in der App** ändern und
+danach `getAreaParameter` lesen. Folgt der Gerätewert, ist es dieselbe Tabelle
+und die App zeigt nur veraltet an; ändert sich nichts, schreibt die App
+woandershin und die Zonenparameter dieser Integration laufen ins Leere.
+
+Unberührt davon sind Start und Stopp einzelner Zonen (`clean` mit `spotArea`) —
+die stammen aus einer MQTT-Aufzeichnung eines echten App-Vorgangs.
+
+Ob `mowHeightLevel` Zentimeter meint, ist damit ebenfalls offen: die App zeigte
+„5cm" und „7cm" bei gespeicherten 5 und 7, was passt, aber ohne die
+Gegenprobe Zufall sein kann. Die Entity trägt die Einheit vorerst aus.
 
 ### Verifiziertes Protokoll
 
