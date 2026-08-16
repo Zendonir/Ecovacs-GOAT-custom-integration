@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Ecovacs GOAT",
-        "description": "Makes GOAT models work that deebot-client does not recognise yet ({models}), and adds zone control.\n\nReuses the connection of the Ecovacs integration you already set up — no second login is created. The Ecovacs integration is reloaded once during setup.\n\nOnly fill in the device field if your account has more than one Ecovacs device.",
+        "description": "Adds zone control for the mower: cutting height, mow mode, obstacle detection and mow direction per zone, plus starting individual zones.\n\nReuses the connection of the Ecovacs integration you already set up — no second login is created.\n\nOnly fill in the device field if your account has more than one Ecovacs device.",
         "data": {
           "device_name": "Device name (optional)"
         },

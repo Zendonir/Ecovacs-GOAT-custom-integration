@@ -19,7 +19,6 @@ from .const import (
     CONF_EXTRA_CLASSES,
     DOMAIN,
     ECOVACS_DOMAIN,
-    UNSUPPORTED_CLASSES,
 )
 
 STEP_USER_SCHEMA = vol.Schema({vol.Optional(CONF_DEVICE_NAME): str})
@@ -46,16 +45,12 @@ class EcovacsGoatConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="ecovacs_not_configured")
 
         if user_input is None:
-            # Absichtlich ohne Geräteprüfung: solange die Geräteklasse nicht
-            # angemeldet ist, kennt die Ecovacs-Integration den Mäher gar nicht -
-            # genau der Fall, für den diese Integration da ist. Das Gerät wird
-            # erst beim Einrichten gesucht, nach der Anmeldung.
+            # Absichtlich ohne Geräteprüfung: ist eine Geräteklasse noch nicht
+            # angemeldet, kennt die Ecovacs-Integration den Mäher an dieser
+            # Stelle noch gar nicht. Gesucht wird erst beim Einrichten, nachdem
+            # etwaige fehlende Klassen nachgetragen wurden.
             return self.async_show_form(
-                step_id="user",
-                data_schema=STEP_USER_SCHEMA,
-                description_placeholders={
-                    "models": ", ".join(UNSUPPORTED_CLASSES.values())
-                },
+                step_id="user", data_schema=STEP_USER_SCHEMA
             )
 
         data = {}

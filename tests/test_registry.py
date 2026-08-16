@@ -37,7 +37,11 @@ def _load_module(name: str) -> types.ModuleType:
 registry = _load_module("registry")
 const = _load_module("const")
 
-UNKNOWN = "e4gqia"
+# Bewusst eine Klasse, die es bei deebot-client nicht gibt und nie geben wird.
+# Nicht e4gqia nehmen: der GOAT A1600 LiDAR Pro ist seit 18.x über einen Symlink
+# (e4gqia.py -> aadham.py -> 51rcxt.py) unterstützt - ein Test darauf würde je
+# nach installierter Version kippen.
+UNKNOWN = "zz0test"
 
 
 @pytest.fixture(autouse=True)
@@ -60,10 +64,23 @@ def test_unknown_class_is_unsupported_without_the_patch():
     assert _lookup(UNKNOWN) is None
 
 
+def test_symlinked_models_count_as_upstream_support():
+    """deebot-client teilt Definitionen über Symlinks - das gilt als Support.
+
+    e4gqia (GOAT A1600 LiDAR Pro) ist so versorgt; wir dürfen es nicht
+    überschreiben, sondern müssen beiseite treten.
+    """
+    if registry._import_hardware_module("deebot_client.hardware.e4gqia") is None:
+        pytest.skip("installierte deebot-client-Version kennt e4gqia noch nicht")
+    assert registry.register_classes({"e4gqia": "Testmodell"}) == {
+        "e4gqia": "supported_upstream"
+    }
+
+
 def test_registration_makes_the_class_resolve_as_a_mower():
     _lookup(UNKNOWN)  # populates deebot-client's negative cache first
 
-    assert registry.register_classes({UNKNOWN: "GOAT A1600 LiDAR Pro"}) == {
+    assert registry.register_classes({UNKNOWN: "Testmodell"}) == {
         UNKNOWN: "registered"
     }
 
@@ -73,7 +90,7 @@ def test_registration_makes_the_class_resolve_as_a_mower():
 
 
 def test_registration_is_idempotent():
-    classes = {UNKNOWN: "GOAT A1600 LiDAR Pro"}
+    classes = {UNKNOWN: "Testmodell"}
     registry.register_classes(classes)
     assert registry.register_classes(classes) == {UNKNOWN: "already_registered"}
 

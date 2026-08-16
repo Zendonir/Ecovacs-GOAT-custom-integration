@@ -7,11 +7,16 @@ erscheint "Device class '<klasse>' not recognized" im Log, und es entstehen
 überhaupt keine Entities - die offizielle Ecovacs-Integration legt für so ein
 Gerät nicht einmal ein Device-Objekt an.
 
-Alle GOAT-Definitionen, die deebot-client mitbringt, sind bis auf ihren
-Docstring byte-identisch. Ein fehlendes Modell lässt sich deshalb über eine
-vorhandene Definition bedienen. Dieses Modul trägt solche Einträge in die
-Registry von deebot-client ein, statt eine Kopie der Definition auszuliefern -
-so bleibt es über deebot-client-Versionen hinweg korrekt.
+Modelle, die sich einen Capability-Satz teilen, pflegt deebot-client selbst über
+Symlinks im hardware-Verzeichnis (in 18.4.0 sind 198 der 244 Einträge Symlinks;
+der GOAT A1600 LiDAR Pro etwa als e4gqia.py -> aadham.py -> 51rcxt.py). Für ein
+Modell, das dort noch fehlt, macht dieses Modul dasselbe zur Laufzeit: es trägt
+einen Eintrag in die Registry von deebot-client ein, der auf eine vorhandene
+Definition zeigt, statt eine Kopie auszuliefern - so bleibt es über
+deebot-client-Versionen hinweg korrekt.
+
+Da der Import einer per Symlink versorgten Klasse ganz normal gelingt, gilt sie
+korrekt als "von upstream unterstützt", und dieses Modul tritt beiseite.
 
 Einmal angemeldete Klassen werden nicht wieder entfernt: die Ecovacs-Integration
 hält ihre Device-Objekte ohnehin bis zum nächsten Neustart, und ein Entfernen

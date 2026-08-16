@@ -5,47 +5,36 @@ offiziellen [Ecovacs-Integration](https://www.home-assistant.io/integrations/eco
 auf und nutzt deren bestehende Verbindung mit — es wird **keine zweite Anmeldung**
 am Ecovacs-Konto aufgebaut.
 
-Sie erledigt zwei Dinge, die aufeinander aufbauen:
-
-1. **Gerät sichtbar machen** — meldet GOAT-Geräteklassen bei `deebot-client` an,
-   die die Bibliothek noch nicht kennt.
-2. **Zonensteuerung** — Parameter je Zone und gezieltes Starten einzelner oder
-   mehrerer Zonen.
+Sie ergänzt die **Zonensteuerung**: Parameter je Zone und gezieltes Starten
+einzelner oder mehrerer Zonen. Zusätzlich kann sie GOAT-Geräteklassen bei
+`deebot-client` nachtragen, die dort noch fehlen.
 
 ---
 
-## 1. Gerät sichtbar machen
+## 1. Hinweis: der A1600 LiDAR Pro läuft von Haus aus
 
 Die Ecovacs-Integration löst die Fähigkeiten eines Geräts über dessen
-**Geräteklasse** auf. Für ein Modell ohne Definition erscheint im Log
+**Geräteklasse** auf. Fehlt eine Definition, erscheint im Log
+`Device class '...' not recognized` und es entstehen **gar keine Entities**.
 
-```
-Device class 'e4gqia' not recognized. Please add support for it
-```
+Für den GOAT A1600 LiDAR Pro (`e4gqia`) ist das **nicht** der Fall: seit
+`deebot-client` 18.x ist die Klasse versorgt — über einen Symlink
+`e4gqia.py` → `aadham.py` → `51rcxt.py` (GOAT A3000 LiDAR Pro). Von den 244
+Einträgen im `hardware`-Verzeichnis sind 198 solche Symlinks; so teilt sich die
+GOAT-Reihe einen Capability-Satz.
 
-und es entstehen **gar keine Entities** — die Integration legt für so ein Gerät
-nicht einmal ein `Device`-Objekt an. `e4gqia` ist der GOAT A1600 LiDAR Pro
-(`GOAT_INT_A1600_LIDAR_PLUS_EU`).
+Mäher, Akku, Fehler, Schnittrichtung und die übrigen Standard-Entities kommen
+also bereits von der offiziellen Integration. Diese Integration ergänzt nur die
+Zonensteuerung.
 
-Alle GOAT-Definitionen in `deebot-client` sind bis auf ihren Docstring
-byte-identisch — `51rcxt` (A3000 LiDAR Pro) und `xmp9ds` (A1600 RTK)
-unterscheiden sich in genau einer Kommentarzeile. Ein unbekanntes GOAT-Modell
-lässt sich also über eine vorhandene Definition bedienen.
+### Falls dein Modell doch fehlt
 
-Die Integration trägt die fehlende Geräteklasse in die Registry von
-`deebot-client` ein und lädt anschließend die Ecovacs-Integration einmal neu,
-damit diese das Gerät anlegt. Sie **verweist** auf die vorhandene Definition,
-statt sie zu kopieren, und bleibt damit korrekt, wenn `deebot-client` die
-GOAT-Fähigkeiten ändert. Sobald die Geräteklasse dort offiziell unterstützt
-wird, erkennt sie das und tritt beiseite.
-
-Mäher, Akku, Fehler und die übrigen Standard-Entities kommen weiterhin von der
-offiziellen Integration.
-
-### Weitere unbekannte GOAT-Modelle
-
-Nennt dein Log eine andere Geräteklasse, trag sie unter *Konfigurieren* ein
-(mit Leerzeichen oder Komma getrennt). Bitte melde sie zusätzlich
+Nennt dein Log `Device class '...' not recognized`, trag die Klasse unter
+*Konfigurieren* ein (mit Leerzeichen oder Komma getrennt). Sie wird dann zur
+Laufzeit mit dem Capability-Satz eines Schwestermodells angemeldet und die
+Ecovacs-Integration einmal neu geladen. Wird die Klasse später upstream
+ergänzt — auch per Symlink — erkennt die Integration das und tritt beiseite.
+Bitte melde solche Modelle zusätzlich
 [upstream](https://github.com/DeebotUniverse/client.py/issues).
 
 ---
@@ -141,6 +130,10 @@ leer.
    Kategorie *Integration*
 3. **Ecovacs GOAT** installieren und Home Assistant neu starten
 
+> Nicht zu verwechseln mit *Einstellungen → Add-ons → Add-on-Store →
+> Repositories*: der erwartet Add-on-Repositories und lehnt dieses hier mit
+> „is not a valid app repository" ab.
+
 ### Manuell
 
 `custom_components/ecovacs_goat` (komplett, inklusive `translations/`) nach
@@ -151,9 +144,10 @@ leer.
 *Einstellungen → Geräte & Dienste → Integration hinzufügen → **Ecovacs GOAT***.
 Das Gerätefeld leer lassen, wenn nur ein Ecovacs-Gerät im Konto ist.
 
-Beim Einrichten wird die Ecovacs-Integration einmal neu geladen. Ist sie beim
-Start noch nicht bereit, greift `ConfigEntryNotReady` — Home Assistant wiederholt
-die Einrichtung selbstständig.
+Ist die Ecovacs-Integration beim Start noch nicht bereit, greift
+`ConfigEntryNotReady` — Home Assistant wiederholt die Einrichtung selbstständig.
+Nur wenn tatsächlich eine Geräteklasse nachgetragen werden musste, wird die
+Ecovacs-Integration dabei einmal neu geladen.
 
 Einmal angemeldete Geräteklassen werden nicht wieder entfernt; nach dem
 Entfernen der Integration wirkt das erst mit dem nächsten Neustart.

@@ -28,9 +28,15 @@ DONOR_CLASSES: Final[tuple[str, ...]] = (
 
 # GOAT-Modelle, die deebot-client noch nicht kennt. Jedes wird mit dem
 # Capability-Satz einer Vorlage von oben angemeldet.
-UNSUPPORTED_CLASSES: Final[dict[str, str]] = {
-    "e4gqia": "GOAT A1600 LiDAR Pro",
-}
+#
+# Standardmässig leer: deebot-client pflegt Modelle, die sich einen Capability-
+# Satz teilen, über Symlinks im hardware-Verzeichnis (198 der 244 Einträge in
+# 18.4.0 sind Symlinks). Der GOAT A1600 LiDAR Pro ist darüber längst versorgt -
+# e4gqia.py -> aadham.py -> 51rcxt.py (GOAT A3000 LiDAR Pro).
+#
+# Wer ein Modell hat, das im Log als "Device class '...' not recognized"
+# auftaucht, trägt dessen Klasse über die Optionen der Integration nach.
+UNSUPPORTED_CLASSES: Final[dict[str, str]] = {}
 
 # --- Zonenparameter ----------------------------------------------------------
 

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Ecovacs GOAT",
-        "description": "Macht GOAT-Modelle nutzbar, die deebot-client noch nicht kennt ({models}), und ergänzt die Zonensteuerung.\n\nNutzt die Verbindung der bereits eingerichteten Ecovacs-Integration mit — es wird keine zweite Anmeldung aufgebaut. Die Ecovacs-Integration wird dabei einmal neu geladen.\n\nDas Gerätefeld nur ausfüllen, wenn mehrere Ecovacs-Geräte im Konto sind.",
+        "description": "Ergänzt die Zonensteuerung für den Mäher: Schnitthöhe, Mähmodus, Hinderniserkennung und Mährichtung je Zone, plus gezieltes Starten einzelner Zonen.\n\nNutzt die Verbindung der bereits eingerichteten Ecovacs-Integration mit — es wird keine zweite Anmeldung aufgebaut.\n\nDas Gerätefeld nur ausfüllen, wenn mehrere Ecovacs-Geräte im Konto sind.",
         "data": {
           "device_name": "Gerätename (optional)"
         },
