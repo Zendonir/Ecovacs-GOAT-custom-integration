@@ -1,100 +1,175 @@
-# Ecovacs GOAT Support
+# Ecovacs GOAT — Home Assistant
 
-Home Assistant custom integration that makes the **Ecovacs GOAT A1600 LiDAR Pro**
-(and other GOAT models deebot-client does not recognise yet) work with the
-official [Ecovacs integration](https://www.home-assistant.io/integrations/ecovacs/).
+Zwei Custom Integrations für den **Ecovacs GOAT A1600 LiDAR Pro**, die beide auf
+der offiziellen [Ecovacs-Integration](https://www.home-assistant.io/integrations/ecovacs/)
+aufsetzen und deren bestehende Verbindung mitbenutzen. Keine baut eine zweite
+Anmeldung am Ecovacs-Konto auf.
 
-## The problem
+| Integration | Zweck |
+| --- | --- |
+| `ecovacs_goat` | Bringt den Mäher überhaupt erst zum Vorschein — meldet die Geräteklasse `e4gqia` bei `deebot-client` an |
+| `ecovacs_zones` | Ergänzt Zonensteuerung: Parameter je Zone, gezieltes Starten einzelner oder mehrerer Zonen |
 
-The Ecovacs integration talks to the cloud through
-[`deebot-client`](https://github.com/DeebotUniverse/client.py). That library
-resolves a device's capabilities from its **device class** — a six-character code
-the cloud reports per model. For a model without a capability definition you get
-this in the log and **no entities at all**:
+Beide sind unabhängig voneinander installierbar. Erscheint der Mäher in Home
+Assistant bereits, wird `ecovacs_goat` nicht gebraucht.
+
+---
+
+## 1. `ecovacs_goat` — Gerät sichtbar machen
+
+Die Ecovacs-Integration löst die Fähigkeiten eines Geräts über dessen
+**Geräteklasse** auf. Für ein Modell ohne Definition erscheint im Log
 
 ```
 Device class 'e4gqia' not recognized. Please add support for it
 ```
 
-`e4gqia` is the GOAT A1600 LiDAR Pro (`GOAT_INT_A1600_LIDAR_PLUS_EU`).
+und es entstehen **gar keine Entities**. `e4gqia` ist der GOAT A1600 LiDAR Pro
+(`GOAT_INT_A1600_LIDAR_PLUS_EU`).
 
-## The approach
+Alle GOAT-Definitionen in `deebot-client` sind bis auf ihren Docstring
+byte-identisch — `51rcxt` (A3000 LiDAR Pro) und `xmp9ds` (A1600 RTK)
+unterscheiden sich in genau einer Kommentarzeile. Ein unbekanntes GOAT-Modell
+lässt sich also über eine vorhandene Definition bedienen.
 
-Every GOAT capability definition shipped by deebot-client is byte-identical apart
-from its docstring — `51rcxt` (A3000 LiDAR Pro) and `xmp9ds` (A1600 RTK) differ
-only in one comment line. So an unknown GOAT model can be served by reusing an
-existing definition.
+Die Integration trägt die fehlende Geräteklasse in die Registry von
+`deebot-client` ein, zeigt dabei auf eine Schwester-Definition und lädt
+anschließend die Ecovacs-Integration neu. Sie **verweist** auf die vorhandene
+Definition, statt sie zu kopieren, und bleibt damit korrekt, wenn `deebot-client`
+die GOAT-Fähigkeiten ändert. Sobald die Geräteklasse dort offiziell unterstützt
+wird, erkennt sie das, tritt beiseite und kann entfernt werden.
 
-This integration registers the missing device class in deebot-client's in-memory
-registry, pointing it at a sibling GOAT definition, and then reloads the Ecovacs
-integration so it re-reads the capabilities. It **reuses** the existing
-definition instead of shipping a copy, so it stays correct when deebot-client
-changes its GOAT capabilities.
+Eigene Entities liefert sie keine — Mäher, Sensoren und Schalter kommen alle von
+der offiziellen Integration.
 
-It provides no entities of its own — the mower, sensors, switches and buttons all
-come from the official Ecovacs integration.
+### Weitere unbekannte GOAT-Modelle
 
-When deebot-client adds the device class upstream, this integration detects that,
-steps aside, and can be removed.
+Nennt dein Log eine andere Geräteklasse, trag sie unter *Konfigurieren* ein
+(mit Leerzeichen oder Komma getrennt). Bitte melde sie zusätzlich hier und
+[upstream](https://github.com/DeebotUniverse/client.py/issues).
 
-## Requirements
+---
 
-- Home Assistant 2024.12 or newer
-- The official **Ecovacs** integration set up with your Ecovacs account
+## 2. `ecovacs_zones` — Zonensteuerung
+
+Die offizielle Integration kennt keine zonenspezifische Steuerung. Diese
+Integration ergänzt sie um Kommandos, die `deebot-client` nicht als eigene
+Klassen kennt, und schickt sie über denselben authentifizierten Kanal
+(`Device.execute_command()` → `iot/devmanager.do`).
+
+### Entities
+
+Je erkannter Zone ein eigenes Gerät **„Mäher Zone N"** mit
+
+- **Schnitthöhe** (`mowHeightLevel`)
+- **Mähmodus** (`cutMode`)
+- **Hinderniserkennung** (`obstacleHeight`)
+- **Mährichtung** (`angle`)
+- **Mähen starten** — startet genau diese Zone
+
+sowie ein Gerät **„Mäher Zonensteuerung"** mit globalem **Stopp**-Button und
+einem **Zonen-Mähstatus**-Sensor (aktuelle Zone, Akku, Ladezustand).
+
+Zonen, die später in der Ecovacs-App dazukommen, erscheinen beim nächsten
+Aktualisierungslauf automatisch.
+
+### Zonennamen
+
+Das Geräteprotokoll kennt **keine** Zonennamen — nur numerische `areaID`s. Namen
+wie „Vorgarten" müssen in Home Assistant manuell vergeben werden (Entity bzw.
+Gerät umbenennen).
+
+### Wertebereiche
+
+Die tatsächlichen Grenzen der Ecovacs-App sind nicht bekannt. Die Min-/Max-Werte
+der Number-Entities sind vorsichtig geschätzt; das Attribut
+`beobachteter_bereich` an jeder Entity zeigt, welche Werte in der Aufzeichnung
+real vorkamen:
+
+| Parameter | Eingestellt | Beobachtet |
+| --- | --- | --- |
+| `mowHeightLevel` | 1–11 | 3–5 |
+| `cutMode` | 1–10 | 4 / 7 |
+| `obstacleHeight` | 0–3 | 1–2 |
+| `angle` | 0–360 | 90–268 |
+
+Werte außerhalb des beobachteten Bereichs sind ungetestet. Anpassbar in
+`const.py` (`FIELD_SPECS`).
+
+### Verifiziertes Protokoll
+
+Aus einer echten MQTT-Aufzeichnung abgeleitet:
+
+```jsonc
+// setAreaParameter — immer alle Pflichtfelder senden
+{"areaID": "2", "mowHeightLevel": 4, "cutMode": 4, "obstacleHeight": 1, "angle": 152}
+
+// getAreaParameter — Request {} , Antwort:
+{"areaParameters": [{"areaID": "1", "mowHeightLevel": 4, "cutMode": 7,
+                     "obstacleHeight": 2, "angle": 180}, ...]}
+
+// clean — Zonen starten/stoppen
+{"act": "start", "content": {"type": "spotArea", "value": "2"}}
+{"act": "start", "content": {"type": "spotArea", "value": "3,2"}}   // mehrere
+{"act": "stop",  "content": {"type": "spotArea"}}
+```
+
+Der Status kommt aus den drei einzeln belegten Kommandos `getCleanInfo`,
+`getBattery` und `getChargeState`. Schlägt eines fehl, bleibt nur dessen Wert
+leer.
+
+### Grenzen
+
+- Bewusst auf **ein** Ecovacs-Gerät ausgelegt. Bei mehreren Geräten grenzt das
+  Feld *Gerätename* ein; Entity- und Geräte-IDs sind nicht mehrgerätefähig, ein
+  zweiter Eintrag wird deshalb abgelehnt.
+- Kartendarstellung/Geometrie (`getAreaSet`) wird nicht dekodiert.
+
+---
+
+## Voraussetzungen
+
+- Home Assistant 2024.12 oder neuer
+- Die offizielle **Ecovacs**-Integration, eingerichtet und verbunden
 
 ## Installation
 
-### HACS
+Den gewünschten Ordner aus `custom_components/` (komplett, inklusive
+`translations/`) nach `<HA-Config>/custom_components/` kopieren und Home
+Assistant neu starten. Danach *Einstellungen → Geräte & Dienste → Integration
+hinzufügen*:
 
-1. HACS → three-dot menu → *Custom repositories*
-2. Add `https://github.com/zendonir/ecovacs-goat-custom-integration`, category
-   *Integration*
-3. Install **Ecovacs GOAT Support** and restart Home Assistant
+- **Ecovacs GOAT Support** — nichts zu konfigurieren
+- **Ecovacs GOAT Zonensteuerung** — Gerätefeld leer lassen, wenn nur ein
+  Ecovacs-Gerät im Konto ist
 
-### Manual
+Ist die Ecovacs-Integration beim Start noch nicht bereit, greift
+`ConfigEntryNotReady` — Home Assistant wiederholt die Einrichtung selbstständig.
 
-Copy `custom_components/ecovacs_goat` into your `config/custom_components/`
-directory and restart Home Assistant.
+> **HACS:** Das Repository enthält zwei Integrationen. HACS erwartet in der
+> Kategorie *Integration* genau eine pro Repository, daher ist der Weg oben die
+> manuelle Installation.
 
-## Setup
+## Tests
 
-*Settings → Devices & Services → Add Integration → **Ecovacs GOAT Support***.
+```bash
+pip install deebot-client pytest pytest-asyncio
+pytest
+```
 
-There is nothing to configure. The Ecovacs integration is reloaded once during
-setup, after which the mower's device and entities appear under it.
+Die Tests laufen ohne Home-Assistant-Installation: geprüft werden die
+Registry-Anmeldung gegen ein echtes `deebot-client` und die Zonen-Protokoll-
+schicht gegen ein Fake-Device (gesendete Kommandos und Antwortauswertung).
 
-### Another unsupported GOAT model
-
-If your log names a device class other than the ones handled out of the box, add
-it under the integration's *Configure* option — space or comma separated. It is
-registered the same way. Please also open an issue here (and upstream at
-[DeebotUniverse/client.py](https://github.com/DeebotUniverse/client.py/issues))
-with the class and model name so it can be added by default.
-
-## Supported out of the box
-
-| Device class | Model |
-| --- | --- |
-| `e4gqia` | GOAT A1600 LiDAR Pro |
-
-## Limitations
-
-Capabilities are taken from a sibling model, so anything the A1600 LiDAR Pro does
-differently from the rest of the GOAT line is not covered. Entity availability
-and state reporting come straight from the official integration. Zone or area
-based mowing is not part of deebot-client's GOAT capability set.
-
-## Troubleshooting
-
-Enable debug logging to see what was registered:
+## Fehlersuche
 
 ```yaml
 logger:
   logs:
     custom_components.ecovacs_goat: debug
+    custom_components.ecovacs_zones: debug
     deebot_client: debug
 ```
 
-Setup fails with a message about deebot-client's registry layout when the library
-has changed internally — please open an issue with your deebot-client version
-(visible in the Ecovacs integration's diagnostics).
+`deebot-client` fängt Fehler in `Command.execute()` ab und liefert dann eine
+leere Antwort — die eigentliche Ursache steht deshalb nur im `deebot_client`-Log.

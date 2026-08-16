@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Ecovacs GOAT zone control",
+        "description": "Reuses the connection of the Ecovacs integration you already set up — no second login is created.\n\nOnly fill in the device field if your account has more than one Ecovacs device; otherwise leave it empty.\n\n{error}",
+        "data": {
+          "device_name": "Device name (optional)"
+        },
+        "data_description": {
+          "device_name": "Part of the device name, e.g. \"iHans\". Leave empty to use the first device found."
+        }
+      }
+    },
+    "error": {
+      "no_device": "No matching Ecovacs device found."
+    },
+    "abort": {
+      "already_configured": "Zone control is already set up for this mower.",
+      "ecovacs_not_configured": "Set up the official Ecovacs integration with your Ecovacs account first."
+    }
+  }
+}

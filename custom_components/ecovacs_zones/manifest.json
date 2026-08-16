@@ -1,0 +1,14 @@
+{
+  "domain": "ecovacs_zones",
+  "name": "Ecovacs GOAT Zonensteuerung",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["ecovacs"],
+  "documentation": "https://github.com/zendonir/ecovacs-goat-custom-integration",
+  "integration_type": "device",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/zendonir/ecovacs-goat-custom-integration/issues",
+  "loggers": ["deebot_client"],
+  "requirements": [],
+  "version": "0.2.0"
+}
