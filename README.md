@@ -35,9 +35,16 @@ Je erkannter Zone ein eigenes Gerät **„&lt;Mäher&gt; Zone N"** mit
 - **Mährichtung** (`angle`)
 - **Mähen starten** — startet genau diese Zone
 
-sowie **„&lt;Mäher&gt; Zonensteuerung"** mit **Zonenmähen stoppen** und einem
-**Mähstatus**-Sensor (aktuelle Zone, Akku, Ladezustand). Beide hängen im
-Gerätebaum unter dem Mäher.
+sowie **„&lt;Mäher&gt; Zonensteuerung"** mit
+
+- **Kantenschnitt starten** — der „Trimmer-Schnitt" der App
+- **Mähen stoppen** — stoppt Zonenmähen und Kantenschnitt gleichermaßen
+- **Mähstatus** (Auftragsart, aktuelle Zone, Akku, Ladezustand)
+
+Beide Geräte hängen im Gerätebaum unter dem Mäher.
+
+**Andocken** braucht keine eigene Entity: das erledigt `lawn_mower.dock` am
+Mäher selbst (es sendet `charge {"act": "go"}`).
 
 Zonen, die später in der Ecovacs-App dazukommen, erscheinen beim nächsten
 Aktualisierungslauf automatisch.
@@ -143,7 +150,27 @@ Aus einer echten MQTT-Aufzeichnung abgeleitet:
 {"act": "start", "content": {"type": "spotArea", "value": "2"}}
 {"act": "start", "content": {"type": "spotArea", "value": "3,2"}}   // mehrere
 {"act": "stop",  "content": {"type": "spotArea"}}
+
+// clean — Kantenschnitt („Trimmer-Schnitt")
+{"act": "start", "content": {"type": "borderrotate",
+                             "value": "reid:1;reid:3;reid:4;reid:5;reid:2"}}
+{"act": "stop",  "content": {"type": "borderrotate"}}
+
+// charge — andocken (deckt lawn_mower.dock ab)
+{"act": "go"}
 ```
+
+Die `reid`-Liste des Kantenschnitts steht nicht in einem eigenen Kommando: die
+Integration liest sie aus dem Mähplan (`getSchedules`, Eintrag mit
+`"mowType": 3`, Feld `ids`) und lässt dessen zusätzliches `vid:`-Element weg —
+genau so schickt die App das clean-Kommando. Wer in der App noch nie einen
+Kantenschnitt im Zeitplan angelegt hat, bekommt beim Drücken des Buttons einen
+entsprechenden Hinweis.
+
+Beim Stoppen erwartet der Mäher denselben `type`, mit dem gestartet wurde.
+**Mähen stoppen** fragt deshalb erst `getCleanInfo` ab (`cleanState.content.type`)
+und schickt den passenden Stopp; ist nichts ermittelbar, bleibt es bei
+`spotArea`.
 
 Der Status kommt aus `getCleanInfo`, `getBattery` und `getChargeState`. Schlägt
 eines fehl, bleibt nur dessen Wert leer.

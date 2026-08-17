@@ -281,9 +281,79 @@ class EcovacsZoneApi:
             "clean", {"act": "start", "content": {"type": "spotArea", "value": value}}
         )
 
-    async def async_stop_zones(self) -> None:
-        """Stoppt das laufende Zonenmähen."""
-        await self._send("clean", {"act": "stop", "content": {"type": "spotArea"}})
+    async def async_stop_zones(self, clean_type: str = "spotArea") -> None:
+        """Stoppt den laufenden Auftrag.
+
+        Der Mäher erwartet im stop-Kommando denselben Typ, mit dem gestartet
+        wurde ("spotArea" beim Zonenmähen, "borderrotate" beim Kantenschnitt).
+        """
+        await self._send("clean", {"act": "stop", "content": {"type": clean_type}})
+
+    async def async_running_clean_type(self) -> str | None:
+        """Der Typ des gerade laufenden Auftrags, oder None wenn keiner läuft."""
+        resp = await self._send("getCleanInfo")
+        clean_state = self.body_data(resp).get("cleanState") or {}
+        content = clean_state.get("content") or {}
+        return content.get("type") or None
+
+    async def async_stop_current(self) -> None:
+        """Stoppt, was gerade läuft - egal ob Zonenmähen oder Kantenschnitt."""
+        try:
+            clean_type = await self.async_running_clean_type()
+        except ZoneApiError as err:
+            _LOGGER.debug("Laufenden Auftrag nicht ermittelbar: %s", err)
+            clean_type = None
+        await self.async_stop_zones(clean_type or "spotArea")
+
+    # --- Kantenschnitt ------------------------------------------------------
+
+    async def async_border_rotate_ids(self) -> str:
+        """Die reid-Liste für den Kantenschnitt.
+
+        Die App schickt beim Kantenschnitt eine Liste der zu umfahrenden Kanten
+        ("reid:1;reid:3;..."). Dieselbe Liste steht im Mähplan in dem Eintrag
+        mit mowType 3, dort zusätzlich mit einem "vid:"-Eintrag, den das
+        clean-Kommando nicht enthält. Sie wird deshalb von dort gelesen statt
+        fest verdrahtet - wer in der App Bereiche ergänzt, bekommt sie so mit.
+        """
+        resp = await self._send("getSchedules")
+        for plan in self.body_data(resp).get("list") or []:
+            if not (subsets := plan.get("subsets")):
+                continue
+            try:
+                rows = decompress_subsets(subsets)
+            except (lzma.LZMAError, ValueError, UnicodeDecodeError) as err:
+                _LOGGER.debug("Mähplan '%s' nicht lesbar: %s", plan.get("name"), err)
+                continue
+            for row in rows if isinstance(rows, list) else []:
+                if not isinstance(row, dict) or row.get("mowType") != 3:
+                    continue
+                ids = [
+                    part
+                    for part in str(row.get("ids") or "").split(";")
+                    if part.startswith("reid:")
+                ]
+                if ids:
+                    return ";".join(ids)
+
+        raise ZoneApiError(
+            "Keine Kanten für den Kantenschnitt gefunden. Lege in der Ecovacs-App "
+            "einmal einen Kantenschnitt im Mähplan an, damit die Kantenliste "
+            "bekannt ist."
+        )
+
+    async def async_start_border_rotate(self) -> None:
+        """Startet den Kantenschnitt (Trimmer-Schnitt) für die ganze Karte."""
+        await self._send(
+            "clean",
+            {
+                "act": "start",
+                "content": {
+                    "type": "borderrotate",
+                    "value": await self.async_border_rotate_ids(),
+                },
+            },
+        )
 
     async def async_get_status(self) -> dict[str, Any]:
         """Fragt Mähstatus, Akku und Ladezustand ab.

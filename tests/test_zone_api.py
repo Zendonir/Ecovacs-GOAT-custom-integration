@@ -574,3 +574,58 @@ def test_obstacle_is_a_choice_not_a_length():
 def test_unknown_obstacle_label_raises():
     with pytest.raises(StopIteration):
         scale.obstacle_level("Mondlandschaft")
+
+
+# --- Kantenschnitt -----------------------------------------------------------
+
+
+async def test_border_rotate_ids_come_from_the_schedule():
+    """Die Kantenliste steht im Mähplan-Eintrag mit mowType 3."""
+    api, _ = make_api(
+        responses={"getSchedules": ok({"list": [{"subsets": SCHEDULE_SUBSETS}]})}
+    )
+    # "vid:1" gehört nur in den Plan, nicht in das clean-Kommando.
+    assert await api.async_border_rotate_ids() == "reid:1;reid:3;reid:4;reid:5;reid:2"
+
+
+async def test_border_rotate_sends_the_payload_of_the_app():
+    api, device = make_api(
+        responses={"getSchedules": ok({"list": [{"subsets": SCHEDULE_SUBSETS}]})}
+    )
+    await api.async_start_border_rotate()
+    assert device.sent[-1].name == "clean"
+    assert device.sent[-1].data == {
+        "act": "start",
+        "content": {
+            "type": "borderrotate",
+            "value": "reid:1;reid:3;reid:4;reid:5;reid:2",
+        },
+    }
+
+
+async def test_border_rotate_without_schedule_entry_explains_itself():
+    api, _ = make_api(responses={"getSchedules": ok({"list": []})})
+    with pytest.raises(ZoneApiError, match="Kantenschnitt"):
+        await api.async_start_border_rotate()
+
+
+async def test_stop_uses_the_type_that_is_running():
+    api, device = make_api(
+        responses={
+            "getCleanInfo": ok(
+                {"cleanState": {"content": {"type": "borderrotate"}}, "state": "clean"}
+            )
+        }
+    )
+    await api.async_stop_current()
+    assert device.sent[-1].data == {
+        "act": "stop",
+        "content": {"type": "borderrotate"},
+    }
+
+
+async def test_stop_falls_back_to_zone_mowing():
+    """Meldet der Mäher keinen Typ, bleibt es beim bisherigen Verhalten."""
+    api, device = make_api(responses={"getCleanInfo": ok({"cleanState": {}})})
+    await api.async_stop_current()
+    assert device.sent[-1].data == {"act": "stop", "content": {"type": "spotArea"}}

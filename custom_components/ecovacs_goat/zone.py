@@ -230,9 +230,14 @@ def async_setup_zone_numbers(
 def async_setup_zone_buttons(
     entry: EcovacsConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
-    """Start-Button je Zone plus ein Stopp-Button je Mäher."""
+    """Start-Button je Zone plus Kantenschnitt und Stopp je Mäher."""
     async_add_entities(
-        EcovacsZoneStopButton(runtime) for runtime in entry.runtime_data.zones.values()
+        button
+        for runtime in entry.runtime_data.zones.values()
+        for button in (
+            EcovacsZoneStopButton(runtime),
+            EcovacsBorderRotateButton(runtime),
+        )
     )
     _async_add_per_zone(
         entry,
@@ -382,12 +387,34 @@ class EcovacsZoneStartButton(ButtonEntity):
         await self._api.async_start_zones([self._zone_id])
 
 
+class EcovacsBorderRotateButton(ButtonEntity):
+    """Löst den Kantenschnitt aus (in der App „Trimmer-Schnitt").
+
+    Wie in der App gibt es den nur für die ganze Karte, nicht je Zone; die
+    Entity hängt deshalb an der Zonensteuerung.
+    """
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:content-cut"
+    _attr_name = "Kantenschnitt starten"
+
+    def __init__(self, runtime: ZoneRuntime) -> None:
+        """Initialize entity."""
+        self._api = runtime.api
+        self._attr_unique_id = f"{self._api.device_id}_border_rotate"
+        self._attr_device_info = _controller_device_info(self._api)
+
+    async def async_press(self) -> None:
+        """Press the button."""
+        await self._api.async_start_border_rotate()
+
+
 class EcovacsZoneStopButton(ButtonEntity):
-    """Stoppt das laufende Zonenmähen (geräteweit, nicht zonenspezifisch)."""
+    """Stoppt den laufenden Auftrag (geräteweit, nicht zonenspezifisch)."""
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:stop"
-    _attr_name = "Zonenmähen stoppen"
+    _attr_name = "Mähen stoppen"
 
     def __init__(self, runtime: ZoneRuntime) -> None:
         """Initialize entity."""
@@ -397,7 +424,8 @@ class EcovacsZoneStopButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Press the button."""
-        await self._api.async_stop_zones()
+        # Stoppt auch einen laufenden Kantenschnitt, nicht nur das Zonenmähen.
+        await self._api.async_stop_current()
 
 
 class EcovacsZoneStatusSensor(SensorEntity):
@@ -437,6 +465,8 @@ class EcovacsZoneStatusSensor(SensorEntity):
         )
         self._attr_extra_state_attributes = {
             "state": clean_info.get("state"),
+            # "spotArea" = Zonenmähen, "borderrotate" = Kantenschnitt.
+            "auftragsart": content.get("type"),
             # Nur bei type "spotArea" ist value eine Zonenliste; bei anderen
             # Mäharten steht dort etwas anderes und wird deshalb ignoriert.
             "aktuelle_zone": (
