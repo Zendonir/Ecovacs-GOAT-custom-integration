@@ -41,8 +41,18 @@ def decompress_subsets(payload: str) -> Any:
     return json.loads(data.decode("utf-8"))
 
 
+# Zustände, in denen der Mäher unterwegs ist. "clean" ist das Mähen selbst,
+# "goCharging" die Rückfahrt zur Station. Pausiert er dabei (motionState
+# "pause"), gilt er als unterbrochen und damit als einstellbar.
+BUSY_STATES = ("clean", "goCharging")
+
+
 class ZoneApiError(HomeAssistantError):
     """Ein Zonen-Kommando konnte nicht ausgeführt werden."""
+
+
+class MowerBusyError(ZoneApiError):
+    """Der Mäher ist unterwegs; Einstellungen bleiben solange gesperrt."""
 
 
 class ZoneOfflineError(ZoneApiError):
@@ -82,6 +92,8 @@ class EcovacsZoneApi:
         self._zone_cache: dict[str, dict[str, Any]] = {}
         # areaID -> Name aus der Karte; leerer Name = verwaister Datensatz
         self._area_names: dict[str, str] = {}
+        # None = noch nie abgefragt
+        self._busy: bool | None = None
         self._lock = asyncio.Lock()
 
     @property
@@ -245,6 +257,7 @@ class EcovacsZoneApi:
         """Setzt EIN Feld einer Zone; die übrigen Pflichtfelder werden aus dem
         zuletzt bekannten Stand ergänzt (die Ecovacs-API erwartet immer alle)."""
         area_id = str(area_id)
+        await self.async_assert_idle()
 
         async with self._lock:
             current = dict(self._zone_cache.get(area_id, {}))
@@ -289,10 +302,42 @@ class EcovacsZoneApi:
         """
         await self._send("clean", {"act": "stop", "content": {"type": clean_type}})
 
+    async def async_get_clean_info(self) -> dict[str, Any]:
+        """Fragt getCleanInfo ab und merkt sich, ob der Mäher unterwegs ist."""
+        info = self.body_data(await self._send("getCleanInfo"))
+        motion = (info.get("cleanState") or {}).get("motionState")
+        self._busy = info.get("state") in BUSY_STATES and motion != "pause"
+        return info
+
+    @property
+    def is_busy(self) -> bool | None:
+        """Ob der Mäher zuletzt unterwegs war; None, solange unbekannt."""
+        return self._busy
+
+    async def async_assert_idle(self) -> None:
+        """Lässt Änderungen nur zu, wenn der Mäher steht.
+
+        Der Mäher übernimmt Parameteränderungen während der Fahrt nicht
+        zuverlässig - eine Zone kann mitten im Mähen nicht umkonfiguriert
+        werden. Lieber deutlich ablehnen als still danebenliegen.
+        """
+        try:
+            await self.async_get_clean_info()
+        except ZoneApiError as err:
+            # Ohne Status wird nicht blockiert: sonst wäre bei einem Aussetzer
+            # der Statusabfrage gar nichts mehr einstellbar.
+            _LOGGER.debug("Mähstatus vor der Änderung nicht abrufbar: %s", err)
+            return
+
+        if self._busy:
+            raise MowerBusyError(
+                f"{self.device_label} ist gerade unterwegs. Einstellungen lassen "
+                "sich nur ändern, wenn er pausiert oder angedockt ist."
+            )
+
     async def async_running_clean_type(self) -> str | None:
         """Der Typ des gerade laufenden Auftrags, oder None wenn keiner läuft."""
-        resp = await self._send("getCleanInfo")
-        clean_state = self.body_data(resp).get("cleanState") or {}
+        clean_state = (await self.async_get_clean_info()).get("cleanState") or {}
         content = clean_state.get("content") or {}
         return content.get("type") or None
 
@@ -379,6 +424,10 @@ class EcovacsZoneApi:
 
         if len(errors) == len(names):
             raise ZoneApiError(f"Statusabfrage fehlgeschlagen: {errors[0]}")
+
+        if (clean_info := status["getCleanInfo"]) is not None:
+            motion = (clean_info.get("cleanState") or {}).get("motionState")
+            self._busy = clean_info.get("state") in BUSY_STATES and motion != "pause"
 
         return {
             "cleanInfo": status["getCleanInfo"],

@@ -97,6 +97,12 @@ async def async_setup_zones(
                 raise UpdateFailed(str(err)) from err
             # Namen nur nachladen, wenn ein unbekannter Bereich auftaucht.
             await api.async_ensure_area_names(zone_ids_from(zones))
+            try:
+                # Hält is_busy aktuell; davon hängt ab, ob die Parameter-
+                # Entities bedienbar sind.
+                await api.async_get_clean_info()
+            except ZoneApiError as err:
+                _LOGGER.debug("Mähstatus nicht abrufbar: %s", err)
             return zones
 
         coordinator: ZoneCoordinator = DataUpdateCoordinator(
@@ -302,8 +308,16 @@ class EcovacsZoneNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        """Nur verfügbar, solange die Zone noch existiert."""
-        return super().available and self._api.get_cached(self._zone_id) is not None
+        """Nur verfügbar, solange die Zone existiert und der Mäher steht.
+
+        Während der Fahrt übernimmt der Mäher keine Parameter; die Entity wird
+        deshalb ausgegraut statt eine Änderung vorzutäuschen.
+        """
+        return (
+            super().available
+            and self._api.get_cached(self._zone_id) is not None
+            and not self._api.is_busy
+        )
 
     @property
     def native_value(self) -> float | None:
@@ -350,8 +364,12 @@ class EcovacsZoneObstacleSelect(CoordinatorEntity, SelectEntity):
 
     @property
     def available(self) -> bool:
-        """Nur verfügbar, solange die Zone existiert und die Stufe bekannt ist."""
-        return super().available and self.current_option is not None
+        """Verfügbar, solange die Stufe bekannt ist und der Mäher steht."""
+        return (
+            super().available
+            and self.current_option is not None
+            and not self._api.is_busy
+        )
 
     @property
     def current_option(self) -> str | None:
@@ -378,6 +396,7 @@ class EcovacsZoneStartButton(ButtonEntity):
     def __init__(self, runtime: ZoneRuntime, zone_id: str) -> None:
         """Initialize entity."""
         self._api = runtime.api
+        self._coordinator = runtime.coordinator
         self._zone_id = zone_id
         self._attr_unique_id = f"{self._api.device_id}_zone_{zone_id}_start"
         self._attr_device_info = _zone_device_info(self._api, zone_id)
@@ -385,6 +404,9 @@ class EcovacsZoneStartButton(ButtonEntity):
     async def async_press(self) -> None:
         """Press the button."""
         await self._api.async_start_zones([self._zone_id])
+        # Holt den neuen Fahrzustand, damit die Parameter-Entities zeitnah
+        # gesperrt werden statt erst beim nächsten regulären Lauf.
+        await self._coordinator.async_request_refresh()
 
 
 class EcovacsBorderRotateButton(ButtonEntity):
@@ -401,12 +423,14 @@ class EcovacsBorderRotateButton(ButtonEntity):
     def __init__(self, runtime: ZoneRuntime) -> None:
         """Initialize entity."""
         self._api = runtime.api
+        self._coordinator = runtime.coordinator
         self._attr_unique_id = f"{self._api.device_id}_border_rotate"
         self._attr_device_info = _controller_device_info(self._api)
 
     async def async_press(self) -> None:
         """Press the button."""
         await self._api.async_start_border_rotate()
+        await self._coordinator.async_request_refresh()
 
 
 class EcovacsZoneStopButton(ButtonEntity):
@@ -419,6 +443,7 @@ class EcovacsZoneStopButton(ButtonEntity):
     def __init__(self, runtime: ZoneRuntime) -> None:
         """Initialize entity."""
         self._api = runtime.api
+        self._coordinator = runtime.coordinator
         self._attr_unique_id = f"{self._api.device_id}_zone_stop"
         self._attr_device_info = _controller_device_info(self._api)
 
@@ -426,6 +451,8 @@ class EcovacsZoneStopButton(ButtonEntity):
         """Press the button."""
         # Stoppt auch einen laufenden Kantenschnitt, nicht nur das Zonenmähen.
         await self._api.async_stop_current()
+        # Gibt die Parameter-Entities zeitnah wieder frei.
+        await self._coordinator.async_request_refresh()
 
 
 class EcovacsZoneStatusSensor(SensorEntity):

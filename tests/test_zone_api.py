@@ -182,7 +182,12 @@ async def test_set_parameter_refreshes_when_cache_is_cold():
         responses={"getAreaParameter": ok({"areaParameters": AREA_PARAMETERS})}
     )
     await api.async_set_zone_parameter("1", "angle", 90)
-    assert [s.name for s in device.sent] == ["getAreaParameter", "setAreaParameter"]
+    # Vor jedem Schreiben wird geprüft, ob der Mäher steht.
+    assert [s.name for s in device.sent] == [
+        "getCleanInfo",
+        "getAreaParameter",
+        "setAreaParameter",
+    ]
     assert device.sent[-1].data["angle"] == 90
 
 
@@ -629,3 +634,60 @@ async def test_stop_falls_back_to_zone_mowing():
     api, device = make_api(responses={"getCleanInfo": ok({"cleanState": {}})})
     await api.async_stop_current()
     assert device.sent[-1].data == {"act": "stop", "content": {"type": "spotArea"}}
+
+
+# --- Sperre während der Fahrt ------------------------------------------------
+
+
+def clean_info(state: str, motion: str | None = None) -> dict[str, Any]:
+    """getCleanInfo-Antwort mit Zustand und Bewegungszustand."""
+    return ok({"state": state, "cleanState": {"motionState": motion} if motion else {}})
+
+
+@pytest.mark.parametrize(
+    ("state", "motion"),
+    [("clean", "working"), ("goCharging", "working"), ("clean", None)],
+)
+async def test_parameters_are_locked_while_the_mower_moves(state, motion):
+    api, device = make_api(
+        responses={
+            "getCleanInfo": clean_info(state, motion),
+            "getAreaParameter": ok({"areaParameters": AREA_PARAMETERS}),
+        }
+    )
+    await api.async_refresh_zones()
+    with pytest.raises(zone_api.MowerBusyError, match="unterwegs"):
+        await api.async_set_zone_parameter("2", "mowHeightLevel", 5)
+    assert api.is_busy is True
+    # Es darf nichts geschrieben worden sein.
+    assert not [s for s in device.sent if s.name == "setAreaParameter"]
+
+
+@pytest.mark.parametrize(
+    ("state", "motion"),
+    [("idle", None), ("clean", "pause"), ("goCharging", "pause")],
+)
+async def test_parameters_are_editable_when_paused_or_docked(state, motion):
+    api, device = make_api(
+        responses={
+            "getCleanInfo": clean_info(state, motion),
+            "getAreaParameter": ok({"areaParameters": AREA_PARAMETERS}),
+        }
+    )
+    await api.async_refresh_zones()
+    await api.async_set_zone_parameter("2", "mowHeightLevel", 5)
+    assert api.is_busy is False
+    assert device.sent[-1].name == "setAreaParameter"
+
+
+async def test_unreadable_status_does_not_lock_everything():
+    """Ohne Statusantwort wird nicht blockiert - sonst ginge gar nichts mehr."""
+    api, device = make_api(
+        responses={
+            "getCleanInfo": {"ret": "fail", "errno": 500},
+            "getAreaParameter": ok({"areaParameters": AREA_PARAMETERS}),
+        }
+    )
+    await api.async_refresh_zones()
+    await api.async_set_zone_parameter("2", "angle", 200)
+    assert device.sent[-1].name == "setAreaParameter"

@@ -110,6 +110,12 @@ async def async_setup_settings(
                     data[reading.key] = api.body_data(result)
             if len(errors) == len(READINGS):
                 raise UpdateFailed(f"Keine Einstellung lesbar: {errors[0]}")
+            try:
+                # Hält is_busy aktuell; solange der Mäher fährt, sind die
+                # schreibbaren Einstellungen gesperrt.
+                await api.async_get_clean_info()
+            except ZoneApiError as err:
+                _LOGGER.debug("Mähstatus nicht abrufbar: %s", err)
             return data
 
         coordinator: SettingsCoordinator = DataUpdateCoordinator(
@@ -207,11 +213,26 @@ class _GoatSettingEntity(CoordinatorEntity):
         reading = _BY_KEY[self._key]
         if reading.set is None:
             raise ZoneApiError(f"'{self._key}' ist nicht schreibbar.")
+        # Wie bei den Zonenparametern: nur im Stand ändern.
+        await self._api.async_assert_idle()
         await self._api.async_send_raw(reading.set, {**self._data, **changes})
         await self.coordinator.async_request_refresh()
 
 
-class GoatSettingSwitch(_GoatSettingEntity, SwitchEntity):
+class _GoatWritableEntity(_GoatSettingEntity):
+    """Basis für Einstellungen, die geschrieben werden können.
+
+    Während der Fahrt sind sie gesperrt - der Mäher übernimmt Änderungen dann
+    nicht zuverlässig.
+    """
+
+    @property
+    def available(self) -> bool:
+        """Nur verfügbar, wenn der Mäher pausiert oder angedockt ist."""
+        return super().available and not self._api.is_busy
+
+
+class GoatSettingSwitch(_GoatWritableEntity, SwitchEntity):
     """Eine Einstellung mit enable-Feld."""
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -239,7 +260,7 @@ class GoatSettingSwitch(_GoatSettingEntity, SwitchEntity):
         await self._async_write({"enable": 0})
 
 
-class GoatRainDelayMinutes(_GoatSettingEntity, NumberEntity):
+class GoatRainDelayMinutes(_GoatWritableEntity, NumberEntity):
     """Wie lange der Mäher nach Regen wartet."""
 
     _attr_entity_category = EntityCategory.CONFIG

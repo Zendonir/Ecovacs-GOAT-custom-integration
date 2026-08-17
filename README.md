@@ -49,6 +49,23 @@ Mäher selbst (es sendet `charge {"act": "go"}`).
 Zonen, die später in der Ecovacs-App dazukommen, erscheinen beim nächsten
 Aktualisierungslauf automatisch.
 
+### Gesperrt, solange der Mäher fährt
+
+Parameter lassen sich nur ändern, wenn der Mäher **pausiert oder angedockt**
+ist — während der Fahrt übernimmt er sie nicht zuverlässig. Betroffen sind alle
+schreibbaren Entities: Schnitthöhe, Geschwindigkeit, Umgebung, Mährichtung
+sowie Regenverzögerung, Tierschutz und Richtungswechsel.
+
+Als „unterwegs" gilt `getCleanInfo` mit `state` `clean` (mähen) oder
+`goCharging` (Rückfahrt), sofern `motionState` nicht `pause` ist. Die Entities
+werden dann ausgegraut; ein trotzdem abgesetzter Dienstaufruf wird mit einer
+Meldung abgelehnt, denn vor jedem Schreiben wird der Zustand frisch abgefragt.
+Ist der Status ausnahmsweise nicht lesbar, wird **nicht** gesperrt — sonst wäre
+bei einem Aussetzer nichts mehr einstellbar.
+
+Start- und Stopp-Buttons aktualisieren den Zustand sofort, die Sperre greift
+also nicht erst beim nächsten regulären Lauf.
+
 ### Zonennamen
 
 Die Namen kommen automatisch aus der Karte. `getAreaParameter` kennt nur
