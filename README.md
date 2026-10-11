@@ -295,7 +295,7 @@ sobald er nötig ist.
   wenn du dich entschieden hast.
 - **Zwei Sitzungen am Konto.** Läuft beides gleichzeitig, hältst du zwei
   MQTT-Verbindungen zum Ecovacs-Konto offen.
-- **`deebot-client`-Version.** Dieser Fork verlangt `18.5.1`; die offizielle
+- **`deebot-client`-Version.** Dieser Fork verlangt `18.6.0`; die offizielle
   Integration pinnt eine andere Version (z. B. `18.4.0`). Home Assistant
   installiert Anforderungen **global** — bei parallelem Betrieb gewinnt beim
   Neustart eine davon, und die andere Integration bricht. Symptom:
